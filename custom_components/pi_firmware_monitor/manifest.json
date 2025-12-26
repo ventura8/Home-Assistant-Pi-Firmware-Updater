@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "type": "device",
   "config_flow": false,
-  "homeassistant": "2024.1.0"
+  "homeassistant": "2025.12.4"
 }
