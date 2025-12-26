@@ -1,0 +1,13 @@
+# Home Assistant Sensitive Files
+.ssh/
+secrets.yaml
+*.log
+ip_address.txt
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+coverage_report/

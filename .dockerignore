@@ -1,0 +1,6 @@
+.git
+coverage
+coverage_report
+*.md
+LICENSE
+.github

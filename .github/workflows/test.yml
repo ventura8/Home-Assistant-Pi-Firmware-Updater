@@ -1,0 +1,223 @@
+name: Run Tests
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Install YamlLint
+        run: pip install yamllint
+
+      - name: Fix Script Permissions
+        run: chmod +x tests/run_tests.sh
+
+      - name: Run ShellCheck
+        run: ./tests/run_tests.sh shellcheck
+
+      - name: Run YamlLint
+        run: ./tests/run_tests.sh yamllint
+
+  build:
+    name: Build Image (${{ matrix.base_image }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        base_image: ["debian:bookworm-slim", "debian:testing-slim"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ matrix.base_image }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.base_image }}-
+
+      - name: Create Sanitized Tag
+        id: meta
+        run: |
+          # Replace colon with hyphen for valid docker tag
+          TAG_NAME=$(echo "${{ matrix.base_image }}" | tr ':' '-')
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Build and Export
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: tests/Dockerfile
+          build-args: BASE_IMAGE=${{ matrix.base_image }}
+          # Use sanitized tag: ha-updater-test:debian-bookworm-slim
+          tags: ha-updater-test:${{ steps.meta.outputs.tag_name }}
+          outputs: type=docker,dest=/tmp/ha-updater-test.tar
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Temp fix to prevent cache growth
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Use sanitized tag name from previous step (no colons)
+          name: docker-image-${{ steps.meta.outputs.tag_name }}
+          path: /tmp/ha-updater-test.tar
+          retention-days: 1
+
+  test:
+    name: Test (${{ matrix.suite }} - ${{ matrix.base_image }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [unit, component, e2e]
+        base_image: ["debian:bookworm-slim", "debian:testing-slim"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Sanitized Tag
+        id: meta
+        run: |
+          # Replace colon with hyphen for valid docker tag and artifact name
+          TAG_NAME=$(echo "${{ matrix.base_image }}" | tr ':' '-')
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Download Docker Image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-${{ steps.meta.outputs.tag_name }}
+          path: /tmp
+
+      - name: Load Docker Image
+        run: |
+          docker load --input /tmp/ha-updater-test.tar
+          # Tag is already sanitized in steps.meta
+          docker tag ha-updater-test:${{ steps.meta.outputs.tag_name }} ha-updater-test
+
+      - name: Run ${{ matrix.suite }} Tests with Coverage
+        run: |
+           docker run --rm \
+             -v ${{ github.workspace }}/coverage:/app/coverage \
+             ha-updater-test /app/tests/run_tests.sh coverage ${{ matrix.suite }}
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Use sanitized tag name for artifact name
+          name: coverage-${{ matrix.suite }}-${{ steps.meta.outputs.tag_name }}
+          path: coverage/
+          retention-days: 1
+          include-hidden-files: true
+
+  report-coverage:
+    name: Generate Coverage Report
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download All Coverage Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-artifacts
+
+      - name: Download Docker Image
+        uses: actions/download-artifact@v4
+        with:
+          # Use one of the built images (bookworm) which contains kcov
+          name: docker-image-debian-bookworm-slim
+          path: /tmp
+
+      - name: Load Docker Image
+        run: |
+          docker load --input /tmp/ha-updater-test.tar
+          # Retag for easier use
+          docker tag ha-updater-test:debian-bookworm-slim ha-updater-test
+
+      - name: Merge Coverage
+        run: |
+          mkdir -p coverage/merged
+
+          # Run kcov merge inside the container
+          # We mount the current workspace to /work so kcov can read artifacts and write the merge
+          docker run --rm \
+            -v ${{ github.workspace }}:/work \
+            ha-updater-test \
+            bash -c "mkdir -p /work/coverage/merged && kcov --merge /work/coverage/merged \$(find /work/coverage-artifacts -mindepth 2 -maxdepth 2 -type d) && chown -R $(id -u):$(id -g) /work/coverage/merged"
+
+      - name: Fix Coverage XML
+        run: |
+          # Use python script to normalize paths, split packages by file, and ensure valid attributes
+          python3 tests/transform_coverage.py coverage/merged/kcov-merged/cobertura.xml
+
+      - name: Publish Code Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage/merged/**/cobertura.xml
+          badge: false
+          fail_below_min: true
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: false
+          indicators: true
+          output: both
+          thresholds: '90 100'
+
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+      - name: Archive Merged Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-coverage-report
+          path: coverage/merged/
+
+      - name: Write to Job Summary
+        run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Detailed Report
+        uses: 5monkeys/cobertura-action@master
+        with:
+          path: coverage/merged/kcov-merged/cobertura.xml
+          minimum_coverage: 90
+          fail_below_threshold: true
+          show_line: true
+          show_branch: true
+          show_missing: true
+          link_missing_lines: true
+          report_name: Detailed Coverage Report

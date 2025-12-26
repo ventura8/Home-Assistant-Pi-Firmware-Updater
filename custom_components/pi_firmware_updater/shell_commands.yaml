@@ -1,0 +1,5 @@
+# Grabs only relevant lines to stay under 255-character sensor limit
+update_pi_firmware_data: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'rpi-eeprom-update' | head -n 5 | tr '\n' ' '"
+
+# Applies the firmware update and reboots the system
+apply_pi_firmware_update: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'rpi-eeprom-update -a && reboot'"

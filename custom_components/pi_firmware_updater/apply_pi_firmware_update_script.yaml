@@ -1,0 +1,7 @@
+alias: "Apply Pi Firmware and Reboot"
+icon: mdi:restart
+sequence:
+  - action: persistent_notification.dismiss
+    data:
+      notification_id: "pi_firmware_alert"
+  - action: shell_command.apply_pi_firmware_update

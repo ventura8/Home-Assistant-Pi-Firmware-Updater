@@ -1,0 +1,15 @@
+- sensor:
+    - name: "Pi Firmware Monitor"
+      unique_id: pi_firmware_monitor
+      state: >
+        {% set raw = states('sensor.pi_firmware_raw') %}
+        {% if 'update available' in raw.lower() %} Update Available
+        {% elif 'up to date' in raw.lower() %} Up to Date
+        {% else %} Checking... {% endif %}
+      attributes:
+        current_version: >
+          {% set raw = states('sensor.pi_firmware_raw') %}
+          {{ raw.split('CURRENT:')[1].split('LATEST:')[0].strip() if 'CURRENT:' in raw else 'Not Found' }}
+        latest_version: >
+          {% set raw = states('sensor.pi_firmware_raw') %}
+          {{ raw.split('LATEST:')[1].split('RELEASE:')[0].strip() if 'LATEST:' in raw else 'Not Found' }}

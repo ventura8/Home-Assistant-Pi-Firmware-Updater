@@ -1,0 +1,13 @@
+{
+  "domain": "pi_firmware_updater",
+  "name": "Raspberry Pi Firmware Monitor",
+  "documentation": "https://github.com/ventura8/Home-Assistant-Pi-Firmware-Updater",
+  "issue_tracker": "https://github.com/ventura8/Home-Assistant-Pi-Firmware-Updater/issues",
+  "dependencies": [],
+  "codeowners": ["@ventura8"],
+  "version": "1.0.0",
+  "iot_class": "local_polling",
+  "type": "device",
+  "config_flow": false,
+  "homeassistant": "2025.12.4"
+}
