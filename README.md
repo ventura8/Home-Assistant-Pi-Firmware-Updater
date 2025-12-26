@@ -13,7 +13,7 @@ This project provides a robust, professional-grade solution for monitoring and u
 ## **📋 Prerequisites**
 
 * \[ \] **Hardware:** Raspberry Pi 4 or 5\.  
-* \[ \] **Software:** Home Assistant OS (HAOS) installed.  
+* \[ \] **Software:** Home Assistant OS (HAOS) installed (Tested on **HAOS 2025.12.4**).  
 * \[ \] **Add-ons:**  
   1. **Advanced SSH & Web Terminal** (Community Add-ons) \- Required for setup commands.  
   2. **HassOS SSH Port Configurator** \- Required to open Port 22222 on the host.  
