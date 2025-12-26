@@ -34,7 +34,7 @@ Before you begin the SSH configuration, you need a way to enter commands into yo
 
 Standard SSH add-ons in HAOS are sandboxed and cannot access the firmware. You must enable "Host Access" on Port 22222\.
 
-1. Install the [**HassOS SSH Port Configurator**](https://github.com/adamoutler/HassOSConfigurator) add-on.  
+1. Install the [**HassOS SSH port 22222 Configurator**](https://github.com/adamoutler/HassOSConfigurator) add-on.  
 2. In the add-on configuration, set a password or paste a public key.  
 3. Start the add-on. This will open Port 22222 on the physical hardware.  
 4. **Verification:** Open the terminal you installed in Step 0 and verify access:
