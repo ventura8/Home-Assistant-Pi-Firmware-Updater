@@ -34,8 +34,17 @@ Copy the contents of `sensor.yaml` and `shell_commands.yaml` (provided in this r
 ### 3. Automations
 Import the `firmware_notification.yaml` to enable the Pixel/Mobile app alerts.
 
-## 📱 Mobile Preview
-The notification includes the exact version strings and a destructive "Install & Reboot" button.
+### 4. 📱 Finding your Mobile App ID
 
----
-*Disclaimer: Use the "Install & Reboot" feature with caution. Always ensure your system is backed up before flashing EEPROM.*
+This project uses actionable notifications. To make the automation work for your specific phone:
+
+  Go to **Developer Tools** > **Actions** (or Services).
+
+  Type `notify.mobile_app_` in the search box.
+
+  You will see an entry like `notify.mobile_app_iphone` or `notify.mobile_app_pixel_9_pro`.
+
+  Copy that exact ID and paste it into the `automations.yaml` file where indicated.
+
+> [!WARNING]
+> *Disclaimer: Use the "Install & Reboot" feature with caution. Always ensure your system is backed up before flashing EEPROM.*
