@@ -1,0 +1,7 @@
+# Note the 'head -n 5' to prevent the 255-character error
+- sensor:
+    name: "Pi Firmware Raw"
+    unique_id: pi_firmware_raw
+    command: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'rpi-eeprom-update' | head -n 5 | tr '\n' ' '"
+    value_template: "{{ value }}"
+    scan_interval: 86400

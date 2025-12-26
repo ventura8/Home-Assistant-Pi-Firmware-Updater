@@ -1,0 +1,13 @@
+#!/bin/bash
+# Mock ssh-keygen
+# Parse args to find -f
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "-f" ]]; then
+      if [[ -n "$2" ]]; then
+          touch "$2"
+          touch "$2.pub"
+      fi
+  fi
+  shift
+done
+exit 0

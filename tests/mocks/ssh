@@ -1,0 +1,24 @@
+#!/bin/bash
+# Mock ssh
+# Usage: ssh [options] [user@]hostname [command]
+
+# If MOCK_SSH_FAIL is set, always fail
+if [ "$MOCK_SSH_FAIL" == "true" ]; then
+    echo "Mock SSH failed (global)"
+    exit 1
+fi
+
+# Check for specific failure mode: Fail only the connection check ('exit')
+# The command is the last argument.
+# We can iterate to find it.
+LAST_ARG="${@: -1}"
+
+if [ "$MOCK_SSH_CONNECTION_CHECK_FAIL" == "true" ]; then
+    if [[ "$LAST_ARG" == "exit" ]]; then
+        echo "Mock SSH connection check failed"
+        exit 1
+    fi
+fi
+
+echo "Mock SSH success"
+exit 0

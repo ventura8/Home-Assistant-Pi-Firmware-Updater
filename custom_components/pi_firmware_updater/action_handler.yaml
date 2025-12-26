@@ -1,0 +1,15 @@
+- alias: "Pi Firmware: Action Handler"
+  id: pi_firmware_action_handler
+  trigger:
+    - platform: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: "INSTALL_PI_FIRMWARE"
+  action:
+    - action: shell_command.apply_pi_firmware_update
+    - action: persistent_notification.dismiss
+      data:
+        notification_id: "pi_firmware_alert"
+    - action: notify.REPLACE_WITH_YOUR_DEVICE_ID
+      data:
+        message: "Update command sent. The Pi will be offline for ~3 minutes while it reboots."
