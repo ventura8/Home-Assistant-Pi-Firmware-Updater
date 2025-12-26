@@ -88,19 +88,19 @@ Add the following files to your `/config/` directory.
 
 Link the files together using the specific filenames:  
 
-```bash
-shell_command: !include shell_commands.yaml  
-command_line: !include command_line_sensors.yaml  
-template: !include template_sensors.yaml  
-automation:  
-  - !include update_notification.yaml  
-  - !include action_handler.yaml  
-script: !include apply_pi_firmware_update_script.yaml
+```yaml
+shell_command: !include custom_components/pi_firmware_monitor/shell_commands.yaml
+command_line: !include custom_components/pi_firmware_monitor/command_line_sensors.yaml
+template: !include custom_components/pi_firmware_monitor/template_sensors.yaml
+automation:
+  - !include custom_components/pi_firmware_monitor/update_notification.yaml
+  - !include custom_components/pi_firmware_monitor/action_handler.yaml
+script: !include custom_components/pi_firmware_monitor/apply_pi_firmware_update_script.yaml
 ```
 
 ### **2\. `shell_commands.yaml`**
 
-```bash
+```yaml
 # Grabs only relevant lines to stay under 255-character sensor limit  
 update_pi_firmware_data: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'rpi-eeprom-update' | head -n 5 | tr '\n' ' '"
 
