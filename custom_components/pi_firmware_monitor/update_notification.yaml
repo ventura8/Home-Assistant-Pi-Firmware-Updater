@@ -22,5 +22,5 @@
     - action: persistent_notification.create
       data:
         title: "🚀 Pi Firmware Update"
-        message: "A new Pi Firmware Update is ready.\n\n**Installed:** `{{ state_attr('sensor.pi_firmware_monitor', 'current_version') }}`\n**Latest:** `{{ state_attr('sensor.pi_firmware_monitor', 'latest_version') }}`\n\n[Install & Reboot](/config/script/edit/custom_components/pi_firmware_monitor/apply_pi_firmware_update_script)"
+        message: "A new Pi Firmware Update is ready.\n\n**Installed:** `{{ state_attr('sensor.pi_firmware_monitor', 'current_version') }}`\n**Latest:** `{{ state_attr('sensor.pi_firmware_monitor', 'latest_version') }}`\n\n[Install & Reboot](/config/script/edit/apply_pi_firmware_update_script)"
         notification_id: "pi_firmware_alert"
