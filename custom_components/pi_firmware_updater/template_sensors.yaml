@@ -1,15 +1,59 @@
 - sensor:
     - name: "Pi Firmware Monitor"
       unique_id: pi_firmware_monitor
-      state: >
-        {% set raw = states('sensor.pi_firmware_raw') %}
-        {% if 'update available' in raw.lower() %} Update Available
-        {% elif 'up to date' in raw.lower() %} Up to Date
-        {% else %} Checking... {% endif %}
+      state: >-
+        {%- set raw = states('sensor.pi_firmware_raw') -%}
+        {%- if 'update_blocked: true' in raw or '"update_blocked": true' in raw or 'update_blocked: "true"' in raw or '"update_blocked":"true"' in raw -%}
+          Upgrade Blocked
+        {%- elif 'update_available: true' in raw or '"update_available": true' in raw or 'update available' in raw.lower() -%}
+          Update Available
+        {%- elif 'up to date' in raw.lower() or 'update_available: false' in raw or '"update_available": false' in raw -%}
+          Up to Date
+        {%- else -%}
+          Checking...
+        {%- endif -%}
       attributes:
         current_version: >
           {% set raw = states('sensor.pi_firmware_raw') %}
-          {{ raw.split('CURRENT:')[1].split('LATEST:')[0].strip() if 'CURRENT:' in raw else 'Not Found' }}
+          {% if 'current_version:' in raw %}
+            {% set suffix = raw.split('current_version:')[1].strip() %}
+            {% if suffix.startswith('"') %}
+              {{ suffix.split('"')[1] }}
+            {% elif suffix.startswith("'") %}
+              {{ suffix.split("'")[1] }}
+            {% else %}
+              {{ suffix.split()[0] }}
+            {% endif %}
+          {% elif '"current_version":' in raw %}
+            {{ raw.split('"current_version":')[1].split(',')[0].split('}')[0].replace('"','').replace("'",'').strip() }}
+          {% else %}
+            Not Found
+          {% endif %}
         latest_version: >
           {% set raw = states('sensor.pi_firmware_raw') %}
-          {{ raw.split('LATEST:')[1].split('RELEASE:')[0].strip() if 'LATEST:' in raw else 'Not Found' }}
+          {% if 'latest_version:' in raw %}
+            {% set suffix = raw.split('latest_version:')[1].strip() %}
+            {% if suffix.startswith('"') %}
+              {{ suffix.split('"')[1] }}
+            {% elif suffix.startswith("'") %}
+              {{ suffix.split("'")[1] }}
+            {% else %}
+              {{ suffix.split()[0] }}
+            {% endif %}
+          {% elif '"latest_version":' in raw %}
+            {{ raw.split('"latest_version":')[1].split(',')[0].split('}')[0].replace('"','').replace("'",'').strip() }}
+          {% else %}
+            Not Found
+          {% endif %}
+        update_blocked: >
+          {% set raw = states('sensor.pi_firmware_raw') %}
+          {{ 'true' if ('update_blocked: true' in raw or '"update_blocked": true' in raw or 'update_blocked: "true"' in raw or '"update_blocked":"true"' in raw) else 'false' }}
+        blocked_reason: >
+          {% set raw = states('sensor.pi_firmware_raw') %}
+          {% if 'blocked_reason:' in raw %}
+            {{ raw.split('blocked_reason:')[1].split()[0].replace('"','').replace("'",'').strip() }}
+          {% elif '"blocked_reason":' in raw %}
+            {{ raw.split('"blocked_reason":')[1].split(',')[0].split('}')[0].replace('"','').replace("'",'').strip() }}
+          {% else %}
+            None
+          {% endif %}

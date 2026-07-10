@@ -30,7 +30,7 @@ WORKDIR /app
 RUN wget https://github.com/SimonKagstrom/kcov/archive/refs/tags/v42.tar.gz -O kcov.tar.gz
 RUN tar xzf kcov.tar.gz
 WORKDIR /app/kcov-42/build
-RUN cmake ..
+RUN cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
 RUN make
 RUN make install
 WORKDIR /app
