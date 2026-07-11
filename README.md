@@ -19,20 +19,23 @@ Update notification example
 ## **✨ Features**
 
 * **Real-time Monitoring:** Tracks `CURRENT` and `LATEST` bootloader versions.  
-* **Actionable Notifications:** "Install & Reboot" directly from your smartphone.  
+* **Actionable Notifications:** "Install & Reboot" directly from your smartphone with integrated update failure handling.  
 * **Persistent Alerts:** Integrated "Bell" notifications on the Home Assistant dashboard.  
+* **Safety Upgrade Blocking:** Automatically detects if running on a Raspberry Pi 3/4-family device booted from an NVMe or USB SSD, and blocks firmware upgrades to prevent bootloader incompatibilities.
+* **Fail-Closed Design:** Aborts updates immediately if API connection queries, JSON parsers, or boot device evaluations fail.
+* **Diagnostic Logging:** Writes background update execution outputs, errors, and status codes to `/var/log/pi_firmware_update.log`.
 * **255-Character Bypass:** Uses optimized SSH piping and string truncation to prevent sensor failure.  
 * **Zero-Password Security:** Uses RSA key pairs for secure hardware communication.
 * **One-Command Setup:** Automated script for SSH key management and Mobile ID config.
 
 ## **📋 Prerequisites**
 
-* \[ \] **Hardware:** Raspberry Pi 4 or 5\.  
-* \[ \] **Software:** Home Assistant OS (HAOS) installed (Tested on **Home Assistant OS 2025.12.4**).  
-* \[ \] **Add-ons:**  
+* [ ] **Hardware:** Raspberry Pi 3, 4 or 5. (Pi 3 is detected only to block unsafe firmware upgrades; it is not otherwise supported.)\.  
+* [ ] **Software:** Home Assistant OS (HAOS) installed (Tested on **Home Assistant OS 2025.12.4**).  
+* [ ] **Add-ons:**  
   1. **Advanced SSH & Web Terminal** (Community Add-ons) \- Required for setup commands.  
   2. **HassOS SSH Port Configurator** \- Required to open Port 22222 on the host.  
-* \[ \] **Mobile App (Optional):** Home Assistant Companion app on your mobile device.
+* [ ] **Mobile App (Optional):** Home Assistant Companion app on your mobile device.
 
 ## **🛠️ Step 0: Add-on Setup (Critical)**
 
@@ -100,7 +103,8 @@ template: !include custom_components/pi_firmware_updater/template_sensors.yaml
 automation:
   - !include custom_components/pi_firmware_updater/update_notification.yaml
   - !include custom_components/pi_firmware_updater/action_handler.yaml
-script: !include custom_components/pi_firmware_updater/apply_pi_firmware_update_script.yaml
+script:
+  apply_pi_firmware_update_script: !include custom_components/pi_firmware_updater/apply_pi_firmware_update_script.yaml
 ```
 
 ## **🗑️ Uninstallation**

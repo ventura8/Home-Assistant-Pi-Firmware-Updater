@@ -7,6 +7,8 @@ When a user requests fixes for a file (or set of files), you must address **both
 
 > [!TIP]
 > **Automated Workflow**: An agent workflow file is available at `.agent/workflows/fix.md`. Standard agents should favor following the steps defined in this workflow.
+> 
+> **Skill Shortcut**: A project skill is also available at `.github/skills/ha-firmware-fix-pass/SKILL.md` for single-pass lint/test/coverage repair requests.
 
 ### Order of Operations
 1.  **Fix Lint Problems First:** Address all `flake8`, `mypy`, or `shellcheck` errors.

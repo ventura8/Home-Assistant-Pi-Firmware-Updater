@@ -11,7 +11,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Running coverage for all suites..." -ForegroundColor Cyan
-mkdir -p coverage
+if (Test-Path -Path coverage) {
+    Remove-Item -Path coverage -Recurse -Force
+}
+$null = New-Item -ItemType Directory -Path coverage -Force
 # Run suites
 docker run --rm -v ${PWD}/coverage:/app/coverage ha-updater-test /app/tests/run_tests.sh coverage unit
 docker run --rm -v ${PWD}/coverage:/app/coverage ha-updater-test /app/tests/run_tests.sh coverage component
