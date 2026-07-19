@@ -97,7 +97,7 @@ jobs:
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Build Image
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: tests/Dockerfile
@@ -200,7 +200,7 @@ jobs:
             ${{ runner.os }}-buildx-${{ steps.merge-image.outputs.tag_name }}-
 
       - name: Build Merge Image (Cached)
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: tests/Dockerfile
