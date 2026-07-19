@@ -5,7 +5,7 @@
 set -e
 
 # Helper to mock block device checks in tests
-if ! declare -F is_block_dev >/dev/null 2>&1; then
+if ! declare -F is_block_dev > /dev/null 2>&1; then
     is_block_dev() {
         [ -b "$1" ]
     }
@@ -18,13 +18,190 @@ emit_summary() {
     local available="$3"
     local blocked="$4"
     local reason="$5"
-    echo "current_version: \"$current\" latest_version: \"$latest\" update_available: $available update_blocked: $blocked blocked_reason: $reason"
+    echo "current_version: \"$current\" latest_version: \"$latest\" " \
+        "update_available: $available update_blocked: $blocked " \
+        "blocked_reason: $reason"
+}
+
+model_requires_boot_block() {
+    case "$1" in
+        *"Raspberry Pi 4"* | *"Raspberry Pi 3"* | *"Compute Module 4"* | *"Compute Module 3"* | *"Pi 400"*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+normalize_device_path() {
+    local device_path="$1"
+
+    if [ -n "$device_path" ] && [[ "$device_path" != /* ]]; then
+        echo "/dev/${device_path##*/}"
+        return 0
+    fi
+
+    echo "$device_path"
+}
+
+resolve_boot_device_identifier() {
+    local boot_device="$1"
+    local link_target=""
+    local uuid_value="${boot_device#*=}"
+
+    case "$boot_device" in
+        PARTUUID=*)
+            if is_block_dev "/dev/disk/by-partuuid/$uuid_value"; then
+                link_target=$(readlink "/dev/disk/by-partuuid/$uuid_value" 2> /dev/null || true)
+                normalize_device_path "$link_target"
+                return 0
+            fi
+            ;;
+        UUID=*)
+            if is_block_dev "/dev/disk/by-uuid/$uuid_value"; then
+                link_target=$(readlink "/dev/disk/by-uuid/$uuid_value" 2> /dev/null || true)
+                normalize_device_path "$link_target"
+                return 0
+            fi
+            ;;
+    esac
+
+    echo "$boot_device"
+}
+
+classify_boot_device() {
+    case "$1" in
+        "")
+            echo "unsupported_boot_device"
+            ;;
+        *nvme*)
+            echo "unsupported_boot_device_nvme"
+            ;;
+        *sd*)
+            echo "unsupported_boot_device_ssd"
+            ;;
+        *mmcblk* | *loop* | *overlay*)
+            echo "allowed"
+            ;;
+        *)
+            echo "unsupported_boot_device"
+            ;;
+    esac
+}
+
+load_eeprom_versions() {
+    if ! command -v rpi-eeprom-update > /dev/null 2>&1; then
+        return 1
+    fi
+
+    if ! EEPROM_OUT=$(timeout 15 rpi-eeprom-update 2> /dev/null); then
+        return 2
+    fi
+
+    CUR_VER=$(echo "$EEPROM_OUT" | grep -m 1 "CURRENT:" | cut -d: -f2- | xargs || true)
+    LAT_VER=$(echo "$EEPROM_OUT" | grep -m 1 "LATEST:" | cut -d: -f2- | xargs || true)
+    BOOTLOADER_LINE=$(echo "$EEPROM_OUT" | grep "BOOTLOADER:" || true)
+
+    if [ -z "$CUR_VER" ] || [ -z "$LAT_VER" ]; then
+        return 3
+    fi
+
+    if echo "$BOOTLOADER_LINE" | grep -q "update available"; then
+        AVAIL="true"
+    else
+        AVAIL="false"
+    fi
+
+    return 0
+}
+
+validate_ha_update_readiness() {
+    local ha_summary=""
+    local err=0
+
+    ha_summary=$(query_ha_firmware) || err=$?
+
+    case "$err" in
+        0)
+            ;;
+        2)
+            echo "ERROR: Failed to query firmware upgrade status from HA OS Agent."
+            return 1
+            ;;
+        *)
+            echo "ERROR: Failed to parse HA OS firmware status response."
+            return 1
+            ;;
+    esac
+
+    if [[ "$ha_summary" == *"update_blocked: true"* ]]; then
+        echo "ERROR: Update is blocked by OS Agent."
+        return 1
+    fi
+
+    if [[ "$ha_summary" != *"update_available: true"* ]]; then
+        echo "ERROR: No firmware update is available."
+        return 1
+    fi
+
+    return 0
+}
+
+validate_fallback_update_readiness() {
+    local boot_status=""
+    local eeprom_check=""
+
+    boot_status=$(check_ssd_boot)
+    if [ "$boot_status" != "allowed" ]; then
+        echo "ERROR: Firmware update is blocked: $boot_status."
+        return 1
+    fi
+
+    if ! command -v rpi-eeprom-update > /dev/null 2>&1; then
+        echo "ERROR: rpi-eeprom-update utility not found."
+        return 1
+    fi
+
+    eeprom_check=$(timeout 15 rpi-eeprom-update 2> /dev/null) || true
+    if ! echo "$eeprom_check" | grep -q "update available"; then
+        echo "ERROR: No firmware update is available."
+        return 1
+    fi
+
+    return 0
+}
+
+build_ha_update_command() {
+    cat << 'CMD'
+echo "=== Update started at $(date) ===" &&
+ha os boards raspberrypi firmware update
+status=$?
+echo "Update exit status: $status"
+[ $status -eq 0 ] && ha host reboot
+CMD
+}
+
+build_fallback_update_command() {
+    cat << 'CMD'
+echo "=== Update started at $(date) ===" &&
+timeout 120 rpi-eeprom-update -a
+status=$?
+echo "Update exit status: $status"
+[ $status -eq 0 ] && reboot
+CMD
+}
+
+launch_background_update() {
+    local update_command="$1"
+    nohup bash -c "$update_command" >> /var/log/pi_firmware_update.log 2>&1 &
 }
 
 # Helper to check if running from SSD/NVMe
 check_ssd_boot() {
     local model_file="${MODEL_FILE:-/proc/device-tree/model}"
     local cmdline_file="${CMDLINE_FILE:-/proc/cmdline}"
+    local boot_device=""
 
     # Check model
     if [ -f "$model_file" ]; then
@@ -34,69 +211,36 @@ check_ssd_boot() {
     fi
 
     # We only block SSD boot on Raspberry Pi 3 and 4 family (including CM3/CM4, CM4S, and Pi 400)
-    if [[ "$MODEL" == *"Raspberry Pi 4"* || "$MODEL" == *"Raspberry Pi 3"* || "$MODEL" == *"Compute Module 4"* || "$MODEL" == *"Compute Module 3"* || "$MODEL" == *"Pi 400"* ]]; then
-        # Find mount point for /boot/firmware, /boot, or /
-        BOOT_DEV=$(findmnt -n -o SOURCE /boot/firmware || findmnt -n -o SOURCE /boot || findmnt -n -o SOURCE / || true)
-        
-        if [ -z "$BOOT_DEV" ] && [ -f "$cmdline_file" ]; then
-            # Match root=something
-            local ROOT_PART
-            ROOT_PART=$(grep -o 'root=[^ ]*' "$cmdline_file" || true)
-            # Remove only the 'root=' prefix
-            BOOT_DEV="${ROOT_PART#root=}"
-            # If it's a UUID/PARTUUID, try to resolve it
-            if [[ "$BOOT_DEV" == UUID=* ]] || [[ "$BOOT_DEV" == PARTUUID=* ]]; then
-                local UUID_VAL="${BOOT_DEV#*=}"
-                if is_block_dev "/dev/disk/by-partuuid/$UUID_VAL"; then
-                    BOOT_DEV=$(readlink "/dev/disk/by-partuuid/$UUID_VAL" 2>/dev/null || true)
-                    if [ -n "$BOOT_DEV" ] && [[ "$BOOT_DEV" != /* ]]; then
-                        BOOT_DEV="/dev/${BOOT_DEV##*/}"
-                    fi
-                elif is_block_dev "/dev/disk/by-uuid/$UUID_VAL"; then
-                    BOOT_DEV=$(readlink "/dev/disk/by-uuid/$UUID_VAL" 2>/dev/null || true)
-                    if [ -n "$BOOT_DEV" ] && [[ "$BOOT_DEV" != /* ]]; then
-                        BOOT_DEV="/dev/${BOOT_DEV##*/}"
-                    fi
-                fi
-            fi
-        fi
-
-        # Guard against empty BOOT_DEV
-        if [ -z "$BOOT_DEV" ]; then
-            echo "unsupported_boot_device"
-            return 0
-        fi
-
-        # If boot/root device matches nvme or sd (USB/SATA SSD), block it
-        if [[ "$BOOT_DEV" == *nvme* ]]; then
-            echo "unsupported_boot_device_nvme"
-            return 0
-        elif [[ "$BOOT_DEV" == *sd* ]]; then
-            echo "unsupported_boot_device_ssd"
-            return 0
-        elif [[ "$BOOT_DEV" == *mmcblk* || "$BOOT_DEV" == *loop* || "$BOOT_DEV" == *overlay* ]]; then
-            echo "allowed"
-            return 0
-        else
-            echo "unsupported_boot_device"
-            return 0
-        fi
+    if ! model_requires_boot_block "$MODEL"; then
+        echo "allowed"
+        return 0
     fi
 
-    echo "allowed"
+    # Find mount point for /boot/firmware, /boot, or /
+    boot_device=$(findmnt -n -o SOURCE /boot/firmware || findmnt -n -o SOURCE /boot || findmnt -n -o SOURCE / || true)
+
+    if [ -z "$boot_device" ] && [ -f "$cmdline_file" ]; then
+        local root_part
+        root_part=$(grep -o 'root=[^ ]*' "$cmdline_file" || true)
+        boot_device=$(resolve_boot_device_identifier "${root_part#root=}")
+    fi
+
+    classify_boot_device "$boot_device"
 }
 
 query_ha_firmware() {
-    if ! command -v ha >/dev/null 2>&1; then
+    if ! command -v ha > /dev/null 2>&1; then
         return 1
     fi
 
     local status_json
-    if ! status_json=$(timeout 15 ha os boards raspberrypi firmware --raw-json 2>/dev/null); then
+    if ! status_json=$(timeout 15 ha os boards raspberrypi firmware --raw-json 2> /dev/null); then
         return 2
     fi
 
-    local FORMATTED; FORMATTED=$(STATUS_JSON="$status_json" python3 - 2>/dev/null <<'EOF'
+    local FORMATTED
+    FORMATTED=$(
+        STATUS_JSON="$status_json" python3 - 2> /dev/null << 'EOF'
 import sys
 import json
 import os
@@ -139,7 +283,11 @@ try:
 
     avail = str(avail_raw).lower()
     block = str(block_raw).lower()
-    print(f"current_version: \"{curr}\" latest_version: \"{late}\" update_available: {avail} update_blocked: {block} blocked_reason: {reas}")
+    print(
+        f"current_version: \"{curr}\" latest_version: \"{late}\" "
+        f"update_available: {avail} update_blocked: {block} "
+        f"blocked_reason: {reas}"
+    )
 except Exception:
     sys.exit(1)
 EOF
@@ -152,40 +300,35 @@ EOF
 run_check() {
     # Check if ha CLI is available and has supervisor integration
     local HA_SUMMARY
+    local boot_status=""
+    local eeprom_status=0
+
     if HA_SUMMARY=$(query_ha_firmware); then
         echo "$HA_SUMMARY"
         return 0
     fi
 
-    # Fallback to manual checking using rpi-eeprom-update and boot dev checks
-    if ! command -v rpi-eeprom-update >/dev/null 2>&1; then
-        emit_summary "Unknown" "Unknown" "false" "true" "rpi_eeprom_update_missing"
-        return 0
-    fi
+    load_eeprom_versions || eeprom_status=$?
 
-    # Extract versions from rpi-eeprom-update
-    if EEPROM_OUT=$(timeout 15 rpi-eeprom-update 2>/dev/null); then
-        CUR_VER=$(echo "$EEPROM_OUT" | grep -m 1 "CURRENT:" | cut -d: -f2- | xargs || true)
-        LAT_VER=$(echo "$EEPROM_OUT" | grep -m 1 "LATEST:" | cut -d: -f2- | xargs || true)
-        BOOTLOADER_LINE=$(echo "$EEPROM_OUT" | grep "BOOTLOADER:" || true)
-        if [ -z "$CUR_VER" ] || [ -z "$LAT_VER" ]; then
+    case "$eeprom_status" in
+        1)
+            emit_summary "Unknown" "Unknown" "false" "true" "rpi_eeprom_update_missing"
+            return 0
+            ;;
+        2)
+            emit_summary "Unknown" "Unknown" "false" "true" "eeprom_query_failed"
+            return 0
+            ;;
+        3)
             emit_summary "Unknown" "Unknown" "false" "true" "eeprom_version_parse_error"
             return 0
-        fi
-        if echo "$BOOTLOADER_LINE" | grep -q "update available"; then
-            AVAIL="true"
-        else
-            AVAIL="false"
-        fi
-    else
-        emit_summary "Unknown" "Unknown" "false" "true" "eeprom_query_failed"
-        return 0
-    fi
+            ;;
+    esac
 
     # Check for SSD boot block
-    BOOT_STATUS=$(check_ssd_boot)
-    if [ "$BOOT_STATUS" != "allowed" ]; then
-        emit_summary "$CUR_VER" "$LAT_VER" "$AVAIL" "true" "$BOOT_STATUS"
+    boot_status=$(check_ssd_boot)
+    if [ "$boot_status" != "allowed" ]; then
+        emit_summary "$CUR_VER" "$LAT_VER" "$AVAIL" "true" "$boot_status"
         return 0
     fi
 
@@ -194,59 +337,30 @@ run_check() {
 
 run_update() {
     # Run checks first
-    if command -v ha >/dev/null 2>&1; then
-        local HA_SUMMARY
-        local err=0
-        HA_SUMMARY=$(query_ha_firmware) || err=$?
-        
-        if [ "$err" -eq 2 ]; then
-            echo "ERROR: Failed to query firmware upgrade status from HA OS Agent."
-            return 1
-        elif [ "$err" -ne 0 ]; then
-            echo "ERROR: Failed to parse HA OS firmware status response."
-            return 1
-        fi
-        
-        # Check if update_blocked: true is in HA_SUMMARY
-        if [[ "$HA_SUMMARY" == *"update_blocked: true"* ]]; then
-            echo "ERROR: Update is blocked by OS Agent."
+    if command -v ha > /dev/null 2>&1; then
+        local ha_update_cmd=""
+
+        if ! validate_ha_update_readiness; then
             return 1
         fi
 
-        # Check if an update is actually available
-        if [[ "$HA_SUMMARY" != *"update_available: true"* ]]; then
-            echo "ERROR: No firmware update is available."
-            return 1
-        fi
-        
-        # If not blocked and update available, apply update using ha in background
+        ha_update_cmd=$(build_ha_update_command)
+
         echo "Applying firmware update via HA OS CLI..."
-        nohup bash -c "(echo \"=== Update started at \$(date) ===\" && ha os boards raspberrypi firmware update; status=\$?; echo \"Update exit status: \$status\"; [ \$status -eq 0 ] && ha host reboot) >> /var/log/pi_firmware_update.log 2>&1" >/dev/null 2>&1 &
+        launch_background_update "$ha_update_cmd"
         return 0
     fi
 
-    # Fallback checks
-    BOOT_STATUS=$(check_ssd_boot)
-    if [ "$BOOT_STATUS" != "allowed" ]; then
-        echo "ERROR: Firmware update is blocked: $BOOT_STATUS."
+    local fallback_update_cmd=""
+
+    if ! validate_fallback_update_readiness; then
         return 1
     fi
 
-    if ! command -v rpi-eeprom-update >/dev/null 2>&1; then
-        echo "ERROR: rpi-eeprom-update utility not found."
-        return 1
-    fi
-
-    # Check if an update is actually available before scheduling
-    local EEPROM_CHECK
-    EEPROM_CHECK=$(timeout 15 rpi-eeprom-update 2>/dev/null) || true
-    if ! echo "$EEPROM_CHECK" | grep -q "update available"; then
-        echo "ERROR: No firmware update is available."
-        return 1
-    fi
+    fallback_update_cmd=$(build_fallback_update_command)
 
     echo "Applying firmware update via rpi-eeprom-update..."
-    nohup bash -c "(echo \"=== Update started at \$(date) ===\" && timeout 120 rpi-eeprom-update -a; status=\$?; echo \"Update exit status: \$status\"; [ \$status -eq 0 ] && reboot) >> /var/log/pi_firmware_update.log 2>&1" >/dev/null 2>&1 &
+    launch_background_update "$fallback_update_cmd"
     return 0
 }
 

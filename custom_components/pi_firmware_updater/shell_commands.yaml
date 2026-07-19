@@ -1,5 +1,13 @@
+---
 # Runs host_check.sh remotely over SSH; tr normalizes output to a single line for the sensor state
-update_pi_firmware_data: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'bash -s' < /config/custom_components/pi_firmware_updater/host_check.sh | tr '\n' ' '"
+update_pi_firmware_data: >-
+  ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa
+  root@127.0.0.1 'bash -s'
+  < /config/custom_components/pi_firmware_updater/host_check.sh
+  | tr '\n' ' '
 
 # Applies the firmware update and reboots the system
-apply_pi_firmware_update: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'bash -s -- --update' < /config/custom_components/pi_firmware_updater/host_check.sh"
+apply_pi_firmware_update: >-
+  ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa
+  root@127.0.0.1 'bash -s -- --update'
+  < /config/custom_components/pi_firmware_updater/host_check.sh

@@ -1,6 +1,7 @@
+---
 name: Run Tests
 
-on:
+'on':
   push:
     branches: ["main", "master"]
   pull_request:
@@ -12,43 +13,77 @@ permissions:
 jobs:
   lint:
     name: Run Lints
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.0
 
-      - name: Install ShellCheck
-        run: sudo apt-get install -y shellcheck
+      - name: Set up Python
+        uses: actions/setup-python@v6.3.0
+        with:
+          python-version: "3.12"
 
-      - name: Install YamlLint
-        run: pip install yamllint
+      - name: Set up Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22.21.0"
+
+      - name: Install lint and formatter tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl xz-utils
+          pip install yamllint==1.38.0 lizard==1.23.0
+          npm install --global markdownlint-cli@0.49.1
+
+          curl -fsSL --retry 6 --retry-delay 2 --retry-all-errors \
+            "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz" \
+            -o shellcheck.tar.xz
+          tar -xJf shellcheck.tar.xz
+          sudo mv shellcheck-v0.11.0/shellcheck /usr/local/bin/shellcheck
+
+          curl -fsSL --retry 6 --retry-delay 2 --retry-all-errors \
+            "https://github.com/mvdan/sh/releases/download/v3.13.1/shfmt_v3.13.1_linux_amd64" \
+            -o shfmt
+          sudo mv shfmt /usr/local/bin/shfmt
+          sudo chmod +x /usr/local/bin/shfmt
+
+          curl -fsSL --retry 6 --retry-delay 2 --retry-all-errors \
+            "https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-linux-x86_64" \
+            -o hadolint
+          sudo mv hadolint /usr/local/bin/hadolint
+          sudo chmod +x /usr/local/bin/hadolint
+
+          curl -fsSL --retry 6 --retry-delay 2 --retry-all-errors \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz" \
+            -o actionlint.tar.gz
+          tar -xzf actionlint.tar.gz actionlint
+          sudo mv actionlint /usr/local/bin/actionlint
+          sudo chmod +x /usr/local/bin/actionlint
 
       - name: Fix Script Permissions
         run: chmod +x tests/run_tests.sh
 
-      - name: Run ShellCheck
-        run: ./tests/run_tests.sh shellcheck
-
-      - name: Run YamlLint
-        run: ./tests/run_tests.sh yamllint
+      - name: Run Mandatory Lint/Format Suite
+        run: ./tests/run_tests.sh lint
 
   build-and-test:
     name: Build & Test (${{ matrix.base_image }})
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         base_image: ["debian:bookworm-slim", "debian:testing-slim"]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v4.2.0
 
       - name: Cache Docker layers
-        uses: actions/cache@v5
+        uses: actions/cache@v6.1.0
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ matrix.base_image }}-${{ github.sha }}
@@ -59,10 +94,10 @@ jobs:
         id: meta
         run: |
           TAG_NAME=$(echo "${{ matrix.base_image }}" | tr ':' '-')
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Build Image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.2.0
         with:
           context: .
           file: tests/Dockerfile
@@ -80,13 +115,22 @@ jobs:
 
       - name: Run Matrix Tests
         run: |
-          mkdir -p coverage/${{ steps.meta.outputs.tag_name }}
-          docker run --rm -v ${{ github.workspace }}/coverage/${{ steps.meta.outputs.tag_name }}:/app/coverage ha-updater-test:${{ steps.meta.outputs.tag_name }} /app/tests/run_tests.sh coverage unit
-          docker run --rm -v ${{ github.workspace }}/coverage/${{ steps.meta.outputs.tag_name }}:/app/coverage ha-updater-test:${{ steps.meta.outputs.tag_name }} /app/tests/run_tests.sh coverage component
-          docker run --rm -v ${{ github.workspace }}/coverage/${{ steps.meta.outputs.tag_name }}:/app/coverage ha-updater-test:${{ steps.meta.outputs.tag_name }} /app/tests/run_tests.sh coverage e2e
+          mkdir -p "coverage/${{ steps.meta.outputs.tag_name }}"
+          docker run --rm \
+            -v "${{ github.workspace }}/coverage/${{ steps.meta.outputs.tag_name }}:/app/coverage" \
+            ha-updater-test:${{ steps.meta.outputs.tag_name }} \
+            /app/tests/run_tests.sh coverage unit
+          docker run --rm \
+            -v "${{ github.workspace }}/coverage/${{ steps.meta.outputs.tag_name }}:/app/coverage" \
+            ha-updater-test:${{ steps.meta.outputs.tag_name }} \
+            /app/tests/run_tests.sh coverage component
+          docker run --rm \
+            -v "${{ github.workspace }}/coverage/${{ steps.meta.outputs.tag_name }}:/app/coverage" \
+            ha-updater-test:${{ steps.meta.outputs.tag_name }} \
+            /app/tests/run_tests.sh coverage e2e
 
       - name: Upload Coverage Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: coverage-${{ steps.meta.outputs.tag_name }}
           path: coverage/${{ steps.meta.outputs.tag_name }}
@@ -103,7 +147,7 @@ jobs:
           EOF
 
       - name: Upload Matrix Manifest
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: matrix-manifest-${{ steps.meta.outputs.tag_name }}
           path: coverage-manifest/${{ steps.meta.outputs.tag_name }}.json
@@ -112,19 +156,19 @@ jobs:
   report-coverage:
     name: Merge Coverage & Publish Reports
     needs: build-and-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v4.2.0
 
       - name: Download Matrix Manifests
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: matrix-manifest-*
           path: coverage-manifest
@@ -139,14 +183,16 @@ jobs:
             exit 1
           fi
 
-          BASE_IMAGE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['base_image'])" "$MANIFEST_FILE")
-          TAG_NAME=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['tag_name'])" "$MANIFEST_FILE")
+          BASE_IMAGE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['base_image'])" \
+            "$MANIFEST_FILE")
+          TAG_NAME=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['tag_name'])" \
+            "$MANIFEST_FILE")
 
-          echo "base_image=$BASE_IMAGE" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "base_image=$BASE_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Cache Docker layers
-        uses: actions/cache@v5
+        uses: actions/cache@v6.1.0
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ steps.merge-image.outputs.tag_name }}-${{ github.sha }}
@@ -154,7 +200,7 @@ jobs:
             ${{ runner.os }}-buildx-${{ steps.merge-image.outputs.tag_name }}-
 
       - name: Build Merge Image (Cached)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.2.0
         with:
           context: .
           file: tests/Dockerfile
@@ -164,7 +210,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
 
       - name: Download Coverage Artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: coverage-*
           path: coverage
@@ -174,41 +220,53 @@ jobs:
         run: |
           mkdir -p coverage/merged
 
-          MERGE_INPUTS=$(find coverage -mindepth 2 -maxdepth 2 -type d \( -name unit -o -name component -o -name e2e \) | sed 's#^coverage#/work/coverage#' | sort | tr '\n' ' ')
+          MERGE_INPUTS=$(
+            find coverage -mindepth 2 -maxdepth 2 -type d \
+              \( -name unit -o -name component -o -name e2e \) \
+              | sed 's#^coverage#/work/coverage#' \
+              | sort \
+              | tr '\n' ' '
+          )
           if [ -z "$MERGE_INPUTS" ]; then
             echo "No coverage inputs found to merge" >&2
             exit 1
           fi
 
           docker run --rm \
-            -v ${{ github.workspace }}:/work \
+            -v "${{ github.workspace }}:/work" \
             ha-updater-test:${{ steps.merge-image.outputs.tag_name }} \
             bash -lc "kcov --merge /work/coverage/merged $MERGE_INPUTS"
-          sudo chown -R $(id -u):$(id -g) coverage/merged
+          sudo chown -R "$(id -u):$(id -g)" coverage/merged
 
       - name: Fix Coverage XML
         run: |
-          python3 tests/transform_coverage.py coverage/merged/kcov-merged/cobertura.xml
+          docker run --rm \
+            -v "${{ github.workspace }}:/work" \
+            ha-updater-test:${{ steps.merge-image.outputs.tag_name }} \
+            python3 /work/tests/transform_coverage.py \
+            /work/coverage/merged/kcov-merged/cobertura.xml \
+            /work/assets/coverage.svg \
+            /work/coverage/coverage-summary.md
 
-      - name: Publish Code Coverage Summary
-        uses: irongut/CodeCoverageSummary@v1.3.0
-        with:
-          filename: coverage/merged/**/cobertura.xml
-          badge: false
-          fail_below_min: true
-          format: markdown
-          hide_branch_rate: false
-          hide_complexity: false
-          indicators: true
-          output: both
-          thresholds: '90 100'
+      - name: Validate Coverage Threshold
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          tree = ET.parse('coverage/merged/kcov-merged/cobertura.xml')
+          root = tree.getroot()
+          line_rate = float(root.get('line-rate', '0'))
+          if line_rate < 0.90:
+              raise SystemExit(f'Coverage threshold failed: {line_rate * 100:.2f}% < 90%')
+          print(f'Coverage threshold validated: {line_rate * 100:.2f}%')
+          PY
 
       - name: Add Coverage PR Comment
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@v3.0.5
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
         with:
           recreate: true
-          path: code-coverage-results.md
+          path: coverage/coverage-summary.md
 
       - name: Write to Job Summary
-        run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+        run: cat coverage/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"

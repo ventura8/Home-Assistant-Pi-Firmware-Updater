@@ -11,3 +11,7 @@ Thumbs.db
 # Coverage reports
 coverage/
 coverage_report/
+
+# Local development artifacts
+.venv/
+.ruff_cache/

@@ -4,14 +4,14 @@ setup() {
     # Create an isolated temp directory for mocks and files per test
     TEST_DIR=$(mktemp -d)
     mkdir -p "$TEST_DIR/bin"
-    
+
     # Path to script under test
     HOST_CHECK_SCRIPT="/app/custom_components/pi_firmware_updater/host_check.sh"
-    
+
     # Setup test file variables
     export MODEL_FILE="$TEST_DIR/model"
     export CMDLINE_FILE="$TEST_DIR/cmdline"
-    
+
     # Setup update and reboot markers
     export UPDATE_MARKER="$TEST_DIR/update_marker"
     export REBOOT_MARKER="$TEST_DIR/reboot_marker"
@@ -20,7 +20,7 @@ setup() {
     # Clean/Reset environment variables
     unset MOCK_EEPROM_EXISTS
     unset MOCK_FINDMNT_DEV
-    
+
     # Prepare clean mock scripts
     # Note: We DO NOT mock 'ha' by default here so that 'command -v ha' fails naturally.
     # Tests that require 'ha' will call create_mock_ha.
@@ -70,29 +70,55 @@ teardown() {
 
 create_mock_ha() {
     local blocked="$1"
-    echo "#!/bin/bash
-if [ \"\$1\" = \"os\" ] && [ \"\$2\" = \"boards\" ] && [ \"\$3\" = \"raspberrypi\" ] && [ \"\$4\" = \"firmware\" ]; then
-    if [ \"\$5\" = \"update\" ]; then
-        echo \"Updating firmware...\"
-        touch \"$UPDATE_MARKER\"
+    cat > "$TEST_DIR/bin/ha" << EOF
+#!/bin/bash
+if [ "\$1" = "os" ] && [ "\$2" = "boards" ] && [ "\$3" = "raspberrypi" ] && [ "\$4" = "firmware" ]; then
+    if [ "\$5" = "update" ]; then
+        echo "Updating firmware..."
+        touch "$UPDATE_MARKER"
         exit 0
     fi
-    if [ \"\$5\" = \"--raw-json\" ]; then
-        if [ \"$blocked\" = \"true\" ]; then
-            echo '{\"result\": \"ok\", \"data\": {\"current_version\": \"1765222194\", \"latest_version\": \"1778498402\", \"update_available\": true, \"update_blocked\": true, \"blocked_reason\": \"unsupported_boot_device\"}}'
+
+    if [ "\$5" = "--raw-json" ]; then
+        if [ "$blocked" = "true" ]; then
+            cat <<'JSON'
+{
+    "result": "ok",
+    "data": {
+        "current_version": "1765222194",
+        "latest_version": "1778498402",
+        "update_available": true,
+        "update_blocked": true,
+        "blocked_reason": "unsupported_boot_device"
+    }
+}
+JSON
         else
-            echo '{\"result\": \"ok\", \"data\": {\"current_version\": \"1765222194\", \"latest_version\": \"1778498402\", \"update_available\": true, \"update_blocked\": false, \"blocked_reason\": \"None\"}}'
+            cat <<'JSON'
+{
+    "result": "ok",
+    "data": {
+        "current_version": "1765222194",
+        "latest_version": "1778498402",
+        "update_available": true,
+        "update_blocked": false,
+        "blocked_reason": "None"
+    }
+}
+JSON
         fi
         exit 0
     fi
 fi
-if [ \"\$1\" = \"host\" ] && [ \"\$2\" = \"reboot\" ]; then
-    echo \"Rebooting host...\"
-    touch \"$REBOOT_MARKER\"
+
+if [ "\$1" = "host" ] && [ "\$2" = "reboot" ]; then
+    echo "Rebooting host..."
+    touch "$REBOOT_MARKER"
     exit 0
 fi
+
 exit 1
-" > "$TEST_DIR/bin/ha"
+EOF
     chmod +x "$TEST_DIR/bin/ha"
 }
 
@@ -100,7 +126,7 @@ exit 1
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -111,7 +137,7 @@ exit 1
     echo -n "Raspberry Pi Compute Module 4 Rev 1.0" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -122,7 +148,7 @@ exit 1
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/sda2"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -133,7 +159,7 @@ exit 1
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -144,7 +170,7 @@ exit 1
     echo -n "Raspberry Pi 5 Model B Rev 1.0" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -154,9 +180,9 @@ exit 1
 @test "HostCheck: Follows 'ha' command block status when HA CLI is available (blocked)" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
-    export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"  # fallback would be allowed
+    export MOCK_FINDMNT_DEV="/dev/mmcblk0p2" # fallback would be allowed
     create_mock_ha true                      # HA CLI is blocked
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -166,9 +192,9 @@ exit 1
 @test "HostCheck: Follows 'ha' command block status when HA CLI is available (allowed)" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
-    export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"  # fallback would be blocked
+    export MOCK_FINDMNT_DEV="/dev/nvme0n1p2" # fallback would be blocked
     create_mock_ha false                     # HA CLI is allowed
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -177,14 +203,14 @@ exit 1
 @test "HostCheck: Falls back in run_check when HA CLI query fails" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
-    export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"  # fallback would be allowed
-    
+    export MOCK_FINDMNT_DEV="/dev/mmcblk0p2" # fallback would be allowed
+
     # Mock HA CLI to fail
     echo '#!/bin/bash
 exit 1
 ' > "$TEST_DIR/bin/ha"
     chmod +x "$TEST_DIR/bin/ha"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -194,15 +220,15 @@ exit 1
 @test "HostCheck: Falls back in run_check when HA CLI returns invalid JSON" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
-    export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"  # fallback would be allowed
-    
+    export MOCK_FINDMNT_DEV="/dev/mmcblk0p2" # fallback would be allowed
+
     # Mock HA CLI to return invalid JSON
     echo '#!/bin/bash
 echo "invalid json"
 exit 0
 ' > "$TEST_DIR/bin/ha"
     chmod +x "$TEST_DIR/bin/ha"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -213,7 +239,7 @@ exit 0
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"
-    
+
     rm -f "$UPDATE_MARKER" "$REBOOT_MARKER"
     run bash "$HOST_CHECK_SCRIPT" --update
     [ "$status" -eq 1 ]
@@ -226,12 +252,12 @@ exit 0
     echo -n "Raspberry Pi 5 Model B Rev 1.0" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"
-    
+
     rm -f "$UPDATE_MARKER" "$REBOOT_MARKER"
     run bash "$HOST_CHECK_SCRIPT" --update
     [ "$status" -eq 0 ]
     [[ "$output" == *"Applying firmware update"* ]]
-    
+
     # Wait up to 2 seconds for background processes to write markers
     for i in {1..20}; do
         [ -f "$UPDATE_MARKER" ] && [ -f "$REBOOT_MARKER" ] && break
@@ -247,7 +273,7 @@ exit 0
     export MOCK_FINDMNT_DEV="/dev/nvme0n1p2"
 
     # Override eeprom mock: -a exits 1 (flash failure), status check reports available
-    cat > "$TEST_DIR/bin/rpi-eeprom-update" <<MOCK
+    cat > "$TEST_DIR/bin/rpi-eeprom-update" << MOCK
 #!/bin/bash
 if [ "\$1" = "-a" ]; then
     echo "Flash failed"
@@ -283,7 +309,7 @@ MOCK
     export MODEL_FILE="$TEST_DIR/non_existent_model"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -294,7 +320,7 @@ MOCK
     echo -n "console=serial0,115200 root=/dev/sda2 rw" > "$CMDLINE_FILE"
     export MOCK_EEPROM_EXISTS="true"
     # force findmnt to fail (MOCK_FINDMNT_DEV is unset)
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -304,7 +330,7 @@ MOCK
 @test "HostCheck: Blocks check if rpi-eeprom-update is missing" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     rm -f "$TEST_DIR/bin/rpi-eeprom-update"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -314,7 +340,7 @@ MOCK
 @test "HostCheck: Blocks updates in update mode when blocked via HA CLI" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     create_mock_ha true
-    
+
     rm -f "$UPDATE_MARKER" "$REBOOT_MARKER"
     run bash "$HOST_CHECK_SCRIPT" --update
     [ "$status" -eq 1 ]
@@ -326,7 +352,7 @@ MOCK
 @test "HostCheck: Blocks updates in update mode when rpi-eeprom-update is missing" {
     echo -n "Raspberry Pi 5 Model B Rev 1.0" > "$MODEL_FILE"
     rm -f "$TEST_DIR/bin/rpi-eeprom-update"
-    
+
     rm -f "$UPDATE_MARKER" "$REBOOT_MARKER"
     run bash "$HOST_CHECK_SCRIPT" --update
     [ "$status" -eq 1 ]
@@ -339,7 +365,7 @@ MOCK
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     rm -f "$CMDLINE_FILE"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -352,7 +378,7 @@ MOCK
 exit 1
 ' > "$TEST_DIR/bin/ha"
     chmod +x "$TEST_DIR/bin/ha"
-    
+
     rm -f "$UPDATE_MARKER" "$REBOOT_MARKER"
     run bash "$HOST_CHECK_SCRIPT" --update
     [ "$status" -eq 1 ]
@@ -368,7 +394,7 @@ echo "not valid json"
 exit 0
 ' > "$TEST_DIR/bin/ha"
     chmod +x "$TEST_DIR/bin/ha"
-    
+
     rm -f "$UPDATE_MARKER" "$REBOOT_MARKER"
     run bash "$HOST_CHECK_SCRIPT" --update
     [ "$status" -eq 1 ]
@@ -377,16 +403,18 @@ exit 0
     [ ! -f "$REBOOT_MARKER" ]
 }
 
-@test "HostCheck: Falls back in run_check when HA CLI JSON is missing required update_blocked key" {
+@test "HostCheck: Falls back when HA JSON misses update_blocked key" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"
 
     # Missing update_blocked must cause parser failure and fallback execution
-    cat > "$TEST_DIR/bin/ha" <<'MOCK'
+    cat > "$TEST_DIR/bin/ha" << 'MOCK'
 #!/bin/bash
 if [ "$1" = "os" ] && [ "$5" = "--raw-json" ]; then
-    echo '{"result":"ok","data":{"current_version":"1765222194","latest_version":"1778498402","update_available":true,"blocked_reason":"None"}}'
+    cat <<'JSON'
+{"result":"ok","data":{"current_version":"1765222194","latest_version":"1778498402","update_available":true,"blocked_reason":"None"}}
+JSON
     exit 0
 fi
 exit 1
@@ -399,13 +427,15 @@ MOCK
     [[ "$output" == *"update_available: true"* ]]
 }
 
-@test "HostCheck: Blocks updates in update mode when HA CLI JSON is missing required update_blocked key" {
+@test "HostCheck: Blocks update when HA JSON misses update_blocked key" {
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
 
-    cat > "$TEST_DIR/bin/ha" <<'MOCK'
+    cat > "$TEST_DIR/bin/ha" << 'MOCK'
 #!/bin/bash
 if [ "$1" = "os" ] && [ "$5" = "--raw-json" ]; then
-    echo '{"result":"ok","data":{"current_version":"1765222194","latest_version":"1778498402","update_available":true,"blocked_reason":"None"}}'
+    cat <<'JSON'
+{"result":"ok","data":{"current_version":"1765222194","latest_version":"1778498402","update_available":true,"blocked_reason":"None"}}
+JSON
     exit 0
 fi
 exit 1
@@ -424,7 +454,7 @@ MOCK
 
     # Record the symlink argument; resolve to an NVMe device (blocked)
     READLINK_ARG_FILE="$TEST_DIR/readlink_arg"
-    cat > "$TEST_DIR/bin/readlink" <<'MOCK'
+    cat > "$TEST_DIR/bin/readlink" << 'MOCK'
 #!/bin/bash
 echo "$1" >> "${READLINK_ARG_FILE}"
 echo "/dev/nvme0n1p2"
@@ -457,7 +487,7 @@ MOCK
 
     # Record the symlink argument; resolve to an SD-card device (allowed)
     READLINK_ARG_FILE="$TEST_DIR/readlink_arg"
-    cat > "$TEST_DIR/bin/readlink" <<'MOCK'
+    cat > "$TEST_DIR/bin/readlink" << 'MOCK'
 #!/bin/bash
 echo "$1" >> "${READLINK_ARG_FILE}"
 echo "/dev/mmcblk0p2"
@@ -486,7 +516,7 @@ MOCK
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"
-    
+
     # Mock rpi-eeprom-update to return up-to-date output
     echo '#!/bin/bash
 echo "BOOTLOADER: up-to-date"
@@ -495,7 +525,7 @@ echo "LATEST: Thu 29 Apr 2021 11:11:25 AM UTC (1619694685)"
 exit 0
 ' > "$TEST_DIR/bin/rpi-eeprom-update"
     chmod +x "$TEST_DIR/bin/rpi-eeprom-update"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: false"* ]]
@@ -506,13 +536,13 @@ exit 0
     echo -n "Raspberry Pi 4 Model B Rev 1.2" > "$MODEL_FILE"
     export MOCK_EEPROM_EXISTS="true"
     export MOCK_FINDMNT_DEV="/dev/mmcblk0p2"
-    
+
     # Mock rpi-eeprom-update to fail (exit 1)
     echo '#!/bin/bash
 exit 1
 ' > "$TEST_DIR/bin/rpi-eeprom-update"
     chmod +x "$TEST_DIR/bin/rpi-eeprom-update"
-    
+
     run bash "$HOST_CHECK_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"update_blocked: true"* ]]
@@ -545,7 +575,18 @@ exit 0
     # Mock HA CLI reporting update_available: false
     echo '#!/bin/bash
 if [ "$1" = "os" ] && [ "$5" = "--raw-json" ]; then
-    echo "{\"result\": \"ok\", \"data\": {\"current_version\": \"1765222194\", \"latest_version\": \"1765222194\", \"update_available\": false, \"update_blocked\": false, \"blocked_reason\": \"None\"}}"
+    cat <<'JSON'
+{
+    "result": "ok",
+    "data": {
+        "current_version": "1765222194",
+        "latest_version": "1765222194",
+        "update_available": false,
+        "update_blocked": false,
+        "blocked_reason": "None"
+    }
+}
+JSON
     exit 0
 fi
 exit 1
@@ -658,7 +699,7 @@ exit 0
 
     # HA CLI: status query succeeds (not blocked, update available),
     # but the actual firmware update command exits 1 (flash failure)
-    cat > "$TEST_DIR/bin/ha" <<MOCK
+    cat > "$TEST_DIR/bin/ha" << MOCK
 #!/bin/bash
 if [ "\$1" = "os" ] && [ "\$2" = "boards" ] && [ "\$3" = "raspberrypi" ] && [ "\$4" = "firmware" ]; then
     if [ "\$5" = "update" ]; then
@@ -667,7 +708,18 @@ if [ "\$1" = "os" ] && [ "\$2" = "boards" ] && [ "\$3" = "raspberrypi" ] && [ "\
         exit 1
     fi
     if [ "\$5" = "--raw-json" ]; then
-        echo '{"result": "ok", "data": {"current_version": "1765222194", "latest_version": "1778498402", "update_available": true, "update_blocked": false, "blocked_reason": "None"}}'
+        cat <<'JSON'
+{
+    "result": "ok",
+    "data": {
+        "current_version": "1765222194",
+        "latest_version": "1778498402",
+        "update_available": true,
+        "update_blocked": false,
+        "blocked_reason": "None"
+    }
+}
+JSON
         exit 0
     fi
 fi
@@ -720,7 +772,18 @@ MOCK
     # HA CLI returns well-formed JSON — exercises line 94 (if ! FORMATTED=...) success branch
     echo '#!/bin/bash
 if [ "$1" = "os" ] && [ "$5" = "--raw-json" ]; then
-    echo "{\"result\": \"ok\", \"data\": {\"current_version\": \"111\", \"latest_version\": \"222\", \"update_available\": true, \"update_blocked\": false, \"blocked_reason\": \"None\"}}"
+    cat <<'JSON'
+{
+    "result": "ok",
+    "data": {
+        "current_version": "111",
+        "latest_version": "222",
+        "update_available": true,
+        "update_blocked": false,
+        "blocked_reason": "None"
+    }
+}
+JSON
     exit 0
 fi
 exit 1
@@ -738,7 +801,7 @@ exit 1
     echo -n "console=serial0,115200 root=PARTUUID=1234-AB rw" > "$CMDLINE_FILE"
     export MOCK_EEPROM_EXISTS="true"
 
-    cat > "$TEST_DIR/bin/readlink" <<'MOCK'
+    cat > "$TEST_DIR/bin/readlink" << 'MOCK'
 #!/bin/bash
 echo "../../nvme0n1p2"
 exit 0
@@ -763,7 +826,7 @@ MOCK
     echo -n "console=serial0,115200 root=UUID=ABCD-1234 rw" > "$CMDLINE_FILE"
     export MOCK_EEPROM_EXISTS="true"
 
-    cat > "$TEST_DIR/bin/readlink" <<'MOCK'
+    cat > "$TEST_DIR/bin/readlink" << 'MOCK'
 #!/bin/bash
 echo "../../sdx2"
 exit 0

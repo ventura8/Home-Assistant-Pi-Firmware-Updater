@@ -1,6 +1,7 @@
 # Project Overview & Directory Structure
 
 ## Goals
+
 The primary goal of this project is to provide a safe, automated, and user-friendly way to update Raspberry Pi firmware from Home Assistant. It bridges the gap between the Home Assistant container and the Raspberry Pi Host OS using secure SSH communication.
 
 ## Directory Structure

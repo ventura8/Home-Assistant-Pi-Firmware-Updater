@@ -6,14 +6,16 @@ The detailed documentation has been split into multiple files for easier navigat
 
 ## Documentation Index
 
-- [Project Overview & Directory Structure](docs/project_overview.md)
+- [Project Overview & Directory Structure](project_overview.md)
   - General project goals and file organization.
-- [Testing & Quality Standards](docs/development_standards.md)
+- [Testing & Quality Standards](development_standards.md)
   - Environment setup, dependency management, and mandatory coverage requirements.
-- [HACS Integration Logic](docs/integration_logic.md)
+- [HACS Integration Logic](integration_logic.md)
   - How the Bash scripts interact with Home Assistant and the Host OS.
-- [AI Agent Workflow](docs/ai_workflow.md)
+- [AI Agent Workflow](ai_workflow.md)
   - Specific guidelines for AI agents regarding linting, testing, and coverage.
+- [Release Descriptions](releases)
+  - GitHub-ready release/PR description markdown for each release commit.
 
 ## Agent Skills
 
@@ -25,3 +27,15 @@ Project-specific Copilot agent skills are available under `.github/skills/`:
 - `install-uninstall-script-maintenance`: Installer/uninstaller SSH and rollback behavior.
 - `bats-kcov-test-authoring`: Bats test authoring and kcov coverage workflows.
 - `release-doc-and-badge-update`: Release docs and coverage badge synchronization.
+
+## Agent Customization Files
+
+Project-level customization and routing files are now included:
+
+- `.github/instructions/project.instructions.md`: Workspace-wide Copilot defaults and quality gate requirements.
+- `.github/agents/project.agent.md`: Default execution policy for coding agents.
+- `.github/prompts/project.prompt.md`: Prompt defaults for repository tasks.
+- `AGENTS.md`: Human-readable map of agent and skill files.
+- `.agent/agents.md`: Mode-level routing guide for task categories.
+- `.github/copilot-instructions.md`: GitHub-scope Copilot instructions.
+- `.github/skills/README.md`: Index for project skill packages.

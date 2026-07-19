@@ -1,10 +1,8 @@
 #!/bin/bash
 set -e
 
-
 CONFIG_DIR="${CONFIG_DIR:-/config/custom_components/pi_firmware_updater}"
 SSH_DIR="${SSH_DIR:-/config/.ssh}"
-
 
 main() {
     echo "🗑️ Starting Raspberry Pi Firmware Updater Uninstaller..."

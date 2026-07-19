@@ -7,11 +7,13 @@ argument-hint: "Installer or uninstaller change scope"
 # Install and Uninstall Script Maintenance
 
 ## When to Use
+
 - Changing custom_components/pi_firmware_updater/install.sh or uninstall.sh.
 - Modifying SSH key handling, first-time setup flow, or rollback behavior.
 - Adjusting how notification IDs are injected into YAML files.
 
 ## Procedure
+
 1. Keep setup idempotent:
    - Re-running install should not duplicate keys or corrupt YAML.
    - Re-running uninstall should be safe when artifacts are already absent.
@@ -26,6 +28,7 @@ argument-hint: "Installer or uninstaller change scope"
 6. Run component tests that validate installer and uninstaller behavior.
 
 ## Review Focus
+
 - No destructive file edits outside integration-owned files.
 - Good error messages for missing prerequisites.
 - Script exit codes reflect real success/failure state.

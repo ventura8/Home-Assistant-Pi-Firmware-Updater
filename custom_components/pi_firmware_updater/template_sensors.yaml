@@ -1,13 +1,27 @@
+---
 - sensor:
     - name: "Pi Firmware Monitor"
       unique_id: pi_firmware_monitor
       state: >-
         {%- set raw = states('sensor.pi_firmware_raw') -%}
-        {%- if 'update_blocked: true' in raw or '"update_blocked": true' in raw or 'update_blocked: "true"' in raw or '"update_blocked":"true"' in raw -%}
+        {%- if
+          'update_blocked: true' in raw or
+          '"update_blocked": true' in raw or
+          'update_blocked: "true"' in raw or
+          '"update_blocked":"true"' in raw
+        -%}
           Upgrade Blocked
-        {%- elif 'update_available: true' in raw or '"update_available": true' in raw or 'update available' in raw.lower() -%}
+        {%- elif
+          'update_available: true' in raw or
+          '"update_available": true' in raw or
+          'update available' in raw.lower()
+        -%}
           Update Available
-        {%- elif 'up to date' in raw.lower() or 'update_available: false' in raw or '"update_available": false' in raw -%}
+        {%- elif
+          'up to date' in raw.lower() or
+          'update_available: false' in raw or
+          '"update_available": false' in raw
+        -%}
           Up to Date
         {%- else -%}
           Checking...
@@ -47,7 +61,14 @@
           {% endif %}
         update_blocked: >
           {% set raw = states('sensor.pi_firmware_raw') %}
-          {{ 'true' if ('update_blocked: true' in raw or '"update_blocked": true' in raw or 'update_blocked: "true"' in raw or '"update_blocked":"true"' in raw) else 'false' }}
+          {{
+            'true' if (
+              'update_blocked: true' in raw or
+              '"update_blocked": true' in raw or
+              'update_blocked: "true"' in raw or
+              '"update_blocked":"true"' in raw
+            ) else 'false'
+          }}
         blocked_reason: >
           {% set raw = states('sensor.pi_firmware_raw') %}
           {% if 'blocked_reason:' in raw %}

@@ -1,8 +1,13 @@
+---
 # Runs host_check.sh remotely over SSH; output is normalized to a single line with tr
 - sensor:
     name: "Pi Firmware Raw"
     unique_id: pi_firmware_raw
-    command: "ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa root@127.0.0.1 'bash -s' < /config/custom_components/pi_firmware_updater/host_check.sh | tr '\n' ' '"
+    command: >-
+      ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa
+      root@127.0.0.1 'bash -s'
+      < /config/custom_components/pi_firmware_updater/host_check.sh
+      | tr '\n' ' '
     value_template: "{{ value }}"
     scan_interval: 86400
     command_timeout: 30
