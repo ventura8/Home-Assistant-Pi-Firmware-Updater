@@ -7,11 +7,13 @@ argument-hint: "Change request or bug in host_check.sh feasibility logic"
 # Host Check Update Safety
 
 ## When to Use
+
 - Edits in custom_components/pi_firmware_updater/host_check.sh.
 - Bugs in update blocking, feasibility checks, or update execution flow.
 - Any request affecting blocked_reason, update_blocked, or fallback detection behavior.
 
 ## Procedure
+
 1. Confirm current behavior against docs/integration_logic.md before changing logic.
 2. Preserve the two-path feasibility model:
    - Preferred path: query supervisor API via ha CLI.
@@ -26,6 +28,7 @@ argument-hint: "Change request or bug in host_check.sh feasibility logic"
 6. Update or add tests in tests/unit/host_check_test.bats and broader suites as needed.
 
 ## Regression Checklist
+
 - Pi 3/4-family SSD and NVMe boot block remains enforced.
 - Non-blocked devices still report current/latest values correctly.
 - Update mode never applies firmware when blocked or query parsing fails.

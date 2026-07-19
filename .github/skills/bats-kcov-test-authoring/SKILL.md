@@ -7,11 +7,13 @@ argument-hint: "Test suite target: unit, component, e2e, or coverage"
 # Bats and kcov Test Authoring
 
 ## When to Use
+
 - Adding tests for shell script changes.
 - Fixing flaky or failing Bats tests.
 - Improving coverage to meet 90% threshold.
 
 ## Procedure
+
 1. Pick the correct suite location:
    - tests/unit for script logic and edge cases.
    - tests/component for integration interactions.
@@ -21,10 +23,11 @@ argument-hint: "Test suite target: unit, component, e2e, or coverage"
    - Avoid Unix-only assumptions in mocks unless guarded.
    - Prefer behavior-level mocks over low-level platform-specific primitives.
 4. Ensure assertions cover both success and fail-closed paths.
-5. Run full local workflow with ./run_local_tests.ps1 after adding tests.
+5. Run full local workflow with ./scripts/run_local_tests.ps1 after adding tests.
 6. Confirm merged coverage reports and badge update behavior are intact.
 
 ## Quality Bar
+
 - Tests should assert user-visible outcomes and exit statuses.
 - New safety logic must include blocked and unblocked scenario coverage.
 - Coverage improvements should target meaningful branches, not only line count.

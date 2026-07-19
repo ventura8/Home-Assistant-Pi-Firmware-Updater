@@ -1,3 +1,4 @@
+---
 - alias: "Pi Firmware: Action Handler"
   id: pi_firmware_action_handler
   trigger:

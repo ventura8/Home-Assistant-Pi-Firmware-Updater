@@ -7,11 +7,13 @@ argument-hint: "Target YAML file and intended behavior change"
 # Home Assistant YAML Integration Edits
 
 ## When to Use
+
 - Modifying files in custom_components/pi_firmware_updater/*.yaml.
 - Adding or changing automations, shell commands, or template sensors.
 - Updating notification, action, or script behavior.
 
 ## Procedure
+
 1. Locate related YAML files and follow existing naming conventions.
 2. Preserve these integration contracts unless explicitly asked to migrate them:
    - Existing entity IDs and script names.
@@ -27,5 +29,6 @@ argument-hint: "Target YAML file and intended behavior change"
 6. If behavior changed for users, update README.md and relevant docs.
 
 ## Safety Notes
+
 - Do not remove block-related attributes update_blocked or blocked_reason when touching monitor logic.
 - Keep blocked update UX explicit in both dashboard and mobile action paths.

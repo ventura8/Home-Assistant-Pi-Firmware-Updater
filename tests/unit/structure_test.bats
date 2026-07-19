@@ -3,7 +3,7 @@
 setup() {
     export CONFIG_DIR="$BATS_TMPDIR/config/custom_components/pi_firmware_updater"
     mkdir -p "$CONFIG_DIR"
-    
+
     # Source the script but don't run main
     # We need to make sure we don't accidentally trample real files if sourcing went wrong
     # The script uses absolute paths /config/.ssh
@@ -12,7 +12,7 @@ setup() {
     # Locally we must be careful.
     # The script uses /config hardcoded. We should probably make that configurable or mock mkdir.
     # For unit tests, we can mock mkdir.
-    
+
     mkdir -p "$BATS_TMPDIR/bin"
     export PATH="$BATS_TMPDIR/bin:$PATH"
 }

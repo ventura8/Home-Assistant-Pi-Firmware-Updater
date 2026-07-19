@@ -8,7 +8,6 @@ set -e
 CONFIG_DIR="${CONFIG_DIR:-/config/custom_components/pi_firmware_updater}"
 SSH_DIR="${SSH_DIR:-/config/.ssh}"
 
-
 main() {
     echo "🚀 Starting Raspberry Pi Firmware Updater setup..."
 
@@ -38,12 +37,15 @@ main() {
     # 4. Authorize Key
     echo "⚡ Authorizing key on Host OS..."
     # We check if we can connect first to avoid hanging
-    if ssh -p 22222 -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "$SSH_DIR/id_rsa" root@127.0.0.1 'exit' 2>/dev/null; then
+    if ssh -p 22222 -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+        -i "$SSH_DIR/id_rsa" root@127.0.0.1 'exit' 2> /dev/null; then
         echo "✅ SSH connection already authorized!"
     else
         # Try to push the key
         echo "Attempting to push key to host..."
-        ssh -p 22222 -o StrictHostKeyChecking=no root@127.0.0.1 'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys' < "$SSH_DIR/id_rsa.pub" || {
+        ssh -p 22222 -o StrictHostKeyChecking=no root@127.0.0.1 \
+            'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys' \
+            < "$SSH_DIR/id_rsa.pub" || {
             echo "❌ ERROR: Could not authorize key. Ensure 'HassOS SSH Port Configurator' is RUNNING."
             exit 1
         }
