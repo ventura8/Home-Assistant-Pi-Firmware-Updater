@@ -10,6 +10,8 @@ setup() {
     # Create dummy yaml files
     echo "action: notify.REPLACE_WITH_YOUR_DEVICE_ID" > "$CONFIG_DIR/update_notification.yaml"
     echo "action: notify.REPLACE_WITH_YOUR_DEVICE_ID" > "$CONFIG_DIR/action_handler.yaml"
+    cp custom_components/pi_firmware_updater/host_check.sh "$CONFIG_DIR/host_check.sh"
+    cp custom_components/pi_firmware_updater/ssh_wrapper.sh "$CONFIG_DIR/ssh_wrapper.sh"
 }
 
 teardown() {
@@ -25,11 +27,13 @@ teardown() {
     # The container has 'ssh' installed?
     # Let's mock 'ssh' to always succeed to simulate successful connection.
 
-    # Mock SSH for this test (local function override or path manipulation? BATS usually path manipulation)
-    mkdir -p "$BATS_TMPDIR/bin"
-    echo -e '#!/bin/bash\nexit 0' > "$BATS_TMPDIR/bin/ssh"
-    chmod +x "$BATS_TMPDIR/bin/ssh"
-    export PATH="$BATS_TMPDIR/bin:$PATH"
+    # Use project SSH/ssh-keygen mocks so authorize + host cleanup payloads succeed
+    export PATH="$BATS_TEST_DIRNAME/../mocks:$PATH"
+    chmod +x "$BATS_TEST_DIRNAME/../mocks/ssh"
+    chmod +x "$BATS_TEST_DIRNAME/../mocks/ssh-keygen"
+    unset MOCK_SSH_FAIL
+    unset MOCK_SSH_CONNECTION_CHECK_FAIL
+    unset MOCK_SSH_AUTHORIZE_FAIL
 
     # Run Install with input
     # We run the script directly so the main guard executes the function.

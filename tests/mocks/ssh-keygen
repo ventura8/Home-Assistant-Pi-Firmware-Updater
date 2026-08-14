@@ -1,13 +1,40 @@
 #!/bin/bash
 # Mock ssh-keygen
-# Parse args to find -f
-while [[ $# -gt 0 ]]; do
-  if [[ "$1" == "-f" ]]; then
-      if [[ -n "$2" ]]; then
-          touch "$2"
-          touch "$2.pub"
-      fi
-  fi
-  shift
+# Supports -f/-C key generation and -y public-key recovery.
+
+comment=""
+outfile=""
+print_pub=false
+args=("$@")
+i=0
+while [ $i -lt ${#args[@]} ]; do
+    if [ "${args[$i]}" = "-f" ]; then
+        outfile="${args[$((i + 1))]}"
+    fi
+    if [ "${args[$i]}" = "-C" ]; then
+        comment="${args[$((i + 1))]}"
+    fi
+    if [ "${args[$i]}" = "-y" ]; then
+        print_pub=true
+    fi
+    i=$((i + 1))
 done
+
+if [ "$print_pub" = true ]; then
+    if [ -n "$outfile" ] && [ -f "$outfile" ]; then
+        echo "ssh-rsa AAAAMOCKRECOVEREDKEYDATALONGERTHANTHIRTYTWOCHARS pi_firmware_updater"
+        exit 0
+    fi
+    echo "mock ssh-keygen -y: missing key file" >&2
+    exit 1
+fi
+
+if [ -n "$outfile" ]; then
+    touch "$outfile"
+    if [ -n "$comment" ]; then
+        echo "ssh-rsa AAAAMOCKKEYDATALONGERTHANTHIRTYTWOCHARSXX ${comment}" > "${outfile}.pub"
+    else
+        touch "${outfile}.pub"
+    fi
+fi
 exit 0

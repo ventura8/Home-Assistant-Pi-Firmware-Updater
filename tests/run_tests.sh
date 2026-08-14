@@ -51,6 +51,7 @@ TARGETS = [
     Path("custom_components/pi_firmware_updater/host_check.sh"),
     Path("custom_components/pi_firmware_updater/install.sh"),
     Path("custom_components/pi_firmware_updater/uninstall.sh"),
+    Path("custom_components/pi_firmware_updater/ssh_wrapper.sh"),
 ]
 
 violations = []

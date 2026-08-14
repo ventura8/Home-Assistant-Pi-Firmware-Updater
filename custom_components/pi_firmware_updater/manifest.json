@@ -5,7 +5,7 @@
   "issue_tracker": "https://github.com/ventura8/Home-Assistant-Pi-Firmware-Updater/issues",
   "dependencies": [],
   "codeowners": ["@ventura8"],
-  "version": "1.0.0",
+  "version": "1.0.3",
   "iot_class": "local_polling",
   "type": "device",
   "config_flow": false,

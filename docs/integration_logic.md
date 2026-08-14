@@ -4,13 +4,42 @@
 
 The project uses RSA key pairs to allow the Home Assistant container to communicate with the Raspberry Pi Host OS on Port 22222.
 
+Private key path: `/config/.ssh/id_rsa` (passphrase-less for unattended `shell_command` use). This path is inside the Home Assistant config directory and is included in HA full backups by default—treat backups as sensitive.
+
 ### `install.sh` Logic
 
-1. Checks for the existence of `ha_pi_updater_rsa`.
-2. Generates keys if missing.
-3. Attempts to copy the public key to the Host OS (Port 22222).
-4. Verifies the connection.
-5. Injects the Mobile Notification ID into the YAML files.
+1. Checks for `/config/.ssh/id_rsa` (regenerates `.pub` via `ssh-keygen -y` if
+   the private key exists alone; aborts if recovery fails).
+2. Generates an RSA key pair if missing (`ssh-keygen` comment `pi_firmware_updater`).
+3. Deploys host copies of `host_check.sh` and `ssh_wrapper.sh` under
+   `/root/.pi_firmware_updater/`, stores the key blob, and upserts a restricted
+   `authorized_keys` line:
+   `restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh" ...`
+4. Managed auth-line removal matches **key blob + wrapper path** (never
+   comment-only deletes).
+5. Wrapper allowlists fixed ops only (`pi_firmware_check`, `pi_firmware_update`,
+   `pi_firmware_uninstall`, `exit`) and never executes caller stdin as a shell
+   program. Deploy/upload ops are **not** allowlisted — install/refresh uses the
+   password bootstrap channel on port 22222.
+6. Re-running install refreshes host scripts and `authorized_keys` via password
+   bootstrap. Public keys are validated (non-empty typed blob) before any remote
+   mutation.
+7. Injects the Mobile Notification ID into the YAML files.
+
+### `uninstall.sh` Logic
+
+1. Attempts host cleanup via `pi_firmware_uninstall` when the local private key
+   exists; if the key is missing or that call fails, attempts password-bootstrap
+   cleanup (SSH without `-i`). If both fail, prints manual remediation steps
+   and records incomplete cleanup.
+2. Deletes local `/config/.ssh/id_rsa` and `id_rsa.pub` when present.
+3. Reverts mobile notification placeholders in the YAML files.
+4. Exits non-zero when host cleanup was incomplete; remains safe to re-run.
+
+### HA remote commands
+
+`shell_commands.yaml` / `command_line_sensors.yaml` invoke fixed host commands
+`pi_firmware_check` and `pi_firmware_update` (no stdin pipe of scripts).
 
 ### 255-Character Bypass
 
@@ -18,7 +47,10 @@ Home Assistant sensors have a 255-character limit for their state. The scripts u
 
 ## Update Mechanism & Safety Blocking
 
-Updates are performed safely by running `host_check.sh` on the Host OS via SSH stdin redirection. The `apply_pi_firmware_update_script.yaml` handles validation, command execution, and reboots.
+Updates are performed safely by running the host-installed `host_check.sh` via
+the fixed SSH forced-command `pi_firmware_update`. The
+`apply_pi_firmware_update_script.yaml` handles validation, command execution,
+and reboots.
 
 ### Feasibility Checks
 

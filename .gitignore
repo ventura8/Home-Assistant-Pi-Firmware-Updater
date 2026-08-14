@@ -12,6 +12,9 @@ Thumbs.db
 coverage/
 coverage_report/
 
+# Local pipeline logs
+reports/
+
 # Local development artifacts
 .venv/
 .ruff_cache/
