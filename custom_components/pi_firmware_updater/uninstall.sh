@@ -4,6 +4,7 @@ set -e
 CONFIG_DIR="${CONFIG_DIR:-/config/custom_components/pi_firmware_updater}"
 SSH_DIR="${SSH_DIR:-/config/.ssh}"
 WRAPPER_PATH="/root/.pi_firmware_updater/ssh_wrapper.sh"
+WRAPPER_DIR="/root/.pi_firmware_updater"
 SSH_PORT=22222
 SSH_TARGET="root@127.0.0.1"
 
@@ -14,17 +15,45 @@ print_manual_host_cleanup() {
     echo "   and delete /root/.pi_firmware_updater/."
 }
 
+cleanup_via_password() {
+    # Bootstrap channel (no integration key): strip wrapper lines + managed dir.
+    local remote_script
+    remote_script=$(
+        cat << EOF
+set -e
+if [ -f /root/.ssh/authorized_keys ]; then
+  awk -v wrap='${WRAPPER_PATH}' '
+    index(\$0, wrap) { next }
+    { print }
+  ' /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.tmp
+  mv /root/.ssh/authorized_keys.tmp /root/.ssh/authorized_keys
+  chmod 600 /root/.ssh/authorized_keys
+fi
+rm -rf ${WRAPPER_DIR}
+EOF
+    )
+    # Pipe script to remote bash -s (avoids ssh heredoc client expansion pitfalls).
+    printf '%s\n' "$remote_script" | ssh -p "$SSH_PORT" \
+        -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+        "$SSH_TARGET" 'bash -s'
+}
+
 cleanup_host_authorization() {
-    if [ ! -f "$SSH_DIR/id_rsa" ]; then
-        echo "⚠️ WARNING: Local private key missing; cannot clean host authorization."
-        print_manual_host_cleanup
-        return 1
+    echo "🧹 Removing host authorized_keys entry and wrapper..."
+
+    if [ -f "$SSH_DIR/id_rsa" ]; then
+        if ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+            -i "$SSH_DIR/id_rsa" "$SSH_TARGET" 'pi_firmware_uninstall' 2> /dev/null; then
+            echo "✅ Host authorization cleaned up."
+            return 0
+        fi
+        echo "ℹ️ Key-path uninstall failed; trying password bootstrap cleanup..."
+    else
+        echo "ℹ️ Local private key missing; trying password bootstrap cleanup..."
     fi
 
-    echo "🧹 Removing host authorized_keys entry and wrapper..."
-    if ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-        -i "$SSH_DIR/id_rsa" "$SSH_TARGET" 'pi_firmware_uninstall' 2> /dev/null; then
-        echo "✅ Host authorization cleaned up."
+    if cleanup_via_password 2> /dev/null; then
+        echo "✅ Host authorization cleaned up via password bootstrap."
         return 0
     fi
 

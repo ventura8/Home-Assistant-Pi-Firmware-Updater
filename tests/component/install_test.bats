@@ -27,12 +27,13 @@ setup() {
 teardown() {
     rm -rf /config/.ssh
     rm -rf /config/custom_components
+    rm -rf /root/.pi_firmware_updater
     rm -f "$MOCK_SSH_LOG" "$MOCK_SSH_STDIN_LOG"
 }
 
 seed_existing_key() {
     touch /config/.ssh/id_rsa
-    echo "ssh-rsa AAAAMOCKEXISTINGKEY pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    echo "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
 }
 
 @test "Fails if Mobile ID is not provided" {
@@ -82,7 +83,18 @@ seed_existing_key() {
     [[ "$output" == *"Regenerating public key"* ]]
     [ -s /config/.ssh/id_rsa.pub ]
     run cat /config/.ssh/id_rsa.pub
-    [[ "$output" == *"AAAAMOCKRECOVEREDKEY"* ]]
+    [[ "$output" == *"AAAAMOCKRECOVEREDKEYDATALONGERTHANTHIRTYTWOCHARS"* ]]
+}
+
+@test "Rejects empty public key before host authorization" {
+    touch /config/.ssh/id_rsa
+    : > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Public key file is missing or empty"* ]] \
+        || [[ "$output" == *"Public key blob is missing"* ]]
 }
 
 @test "Handles SSH Authorization Failure" {
@@ -101,52 +113,42 @@ seed_existing_key() {
     run bash "$INSTALL_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Authorization successful"* ]]
-    [[ "$output" == *"Attempting to push restricted key"* ]]
+    [[ "$output" == *"password bootstrap"* ]]
     grep -q "identity=no" "$MOCK_SSH_LOG"
 }
 
-@test "Refreshes restricted authorization when key auth already works" {
+@test "Refreshes host auth via password bootstrap when key auth works" {
     seed_existing_key
     export MOBILE_ID="notify.test"
 
     run bash "$INSTALL_SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"refreshing host authorization"* ]]
+    [[ "$output" == *"password bootstrap"* ]]
     [[ "$output" == *"Authorization successful"* ]]
-    grep -q "identity=yes cmd=pi_firmware_deploy_host_check" "$MOCK_SSH_LOG"
-    grep -q "identity=yes cmd=pi_firmware_deploy_wrapper" "$MOCK_SSH_LOG"
-    grep -q "identity=yes cmd=pi_firmware_deploy_auth" "$MOCK_SSH_LOG"
+    grep -q "identity=yes cmd=exit" "$MOCK_SSH_LOG"
+    grep -q "identity=no" "$MOCK_SSH_LOG"
     grep -q 'restrict,from="127.0.0.1"' "$MOCK_SSH_STDIN_LOG"
-    grep -q "ssh_wrapper.sh" "$MOCK_SSH_STDIN_LOG"
 }
 
 @test "Wrapper allowlists fixed ops and denies arbitrary commands" {
     WRAPPER=/config/custom_components/pi_firmware_updater/ssh_wrapper.sh
     chmod +x "$WRAPPER"
 
-    # Denied command must fail closed
     run env SSH_ORIGINAL_COMMAND='rm -rf /' bash "$WRAPPER"
     [ "$status" -ne 0 ]
     [[ "$output" == *"command denied"* ]]
 
-    # exit / empty succeed without executing stdin
+    run env SSH_ORIGINAL_COMMAND='pi_firmware_deploy_host_check' bash "$WRAPPER"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"command denied"* ]]
+
     run env SSH_ORIGINAL_COMMAND='exit' bash "$WRAPPER"
     [ "$status" -eq 0 ]
 
     run env SSH_ORIGINAL_COMMAND='' bash "$WRAPPER"
     [ "$status" -eq 0 ]
 
-    # deploy_host_check writes stdin to managed path without exec as shell
     mkdir -p /root/.pi_firmware_updater
-    run bash -c "printf '%s\n' 'echo PWNED' | env SSH_ORIGINAL_COMMAND='pi_firmware_deploy_host_check' bash '$WRAPPER'"
-    [ "$status" -eq 0 ]
-    [ -f /root/.pi_firmware_updater/host_check.sh ]
-    run cat /root/.pi_firmware_updater/host_check.sh
-    [[ "$output" == "echo PWNED" ]]
-    # Prove contents were not executed as a program by the wrapper itself
-    [[ "$output" != *"PWNED executed"* ]]
-
-    # Permitted check/update invoke host script path (create stub)
     printf '%s\n' '#!/bin/bash' 'echo CHECK_OK' > /root/.pi_firmware_updater/host_check.sh
     chmod 700 /root/.pi_firmware_updater/host_check.sh
     run env SSH_ORIGINAL_COMMAND='pi_firmware_check' bash "$WRAPPER"
@@ -158,8 +160,6 @@ seed_existing_key() {
     run env SSH_ORIGINAL_COMMAND='pi_firmware_update' bash "$WRAPPER"
     [ "$status" -eq 0 ]
     [[ "$output" == *"UPDATE_OK"* ]]
-
-    rm -rf /root/.pi_firmware_updater
 }
 
 @test "Sets correct permissions on .ssh files" {

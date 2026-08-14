@@ -31,7 +31,7 @@ Trace changes through related files:
 
 ```text
 host_check.sh (host)
-    │ SSH stdin / monitor output
+    │ fixed forced-command (pi_firmware_check/update) + monitor output
     ▼
 shell_commands.yaml ──────────► apply_pi_firmware_update_script.yaml
     │

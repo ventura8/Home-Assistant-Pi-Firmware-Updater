@@ -8,7 +8,7 @@ setup() {
     echo "    - action: notify.my_phone" > /config/custom_components/pi_firmware_updater/action_handler.yaml
 
     touch /config/.ssh/id_rsa
-    echo "ssh-rsa AAAAMOCKEXISTINGKEY pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    echo "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
 
     SCRIPT_DIR="/app/custom_components/pi_firmware_updater"
     UNINSTALL_SCRIPT="$SCRIPT_DIR/uninstall.sh"
@@ -65,16 +65,27 @@ teardown() {
     [[ "$output" == *"notify.REPLACE_WITH_YOUR_DEVICE_ID"* ]]
 }
 
-@test "Missing keys warn, continue local cleanup, and exit nonzero" {
+@test "Missing keys try password bootstrap then exit nonzero on failure" {
+    rm -f /config/.ssh/id_rsa
+    rm -f /config/.ssh/id_rsa.pub
+    export MOCK_SSH_AUTHORIZE_FAIL="true"
+
+    run bash "$UNINSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"password bootstrap cleanup"* ]]
+    [[ "$output" == *"No SSH keys found"* ]]
+    [[ "$output" == *"incomplete host cleanup"* ]]
+    grep -q "identity=no cmd=bash -s" "$MOCK_SSH_LOG"
+}
+
+@test "Missing keys succeed via password bootstrap cleanup" {
     rm -f /config/.ssh/id_rsa
     rm -f /config/.ssh/id_rsa.pub
 
     run bash "$UNINSTALL_SCRIPT"
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"Local private key missing"* ]]
-    [[ "$output" == *"No SSH keys found"* ]]
-    [[ "$output" == *"incomplete host cleanup"* ]]
-    [ ! -f "$MOCK_SSH_LOG" ] || [ ! -s "$MOCK_SSH_LOG" ]
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"password bootstrap cleanup"* ]]
+    grep -q "identity=no cmd=bash -s" "$MOCK_SSH_LOG"
 }
 
 @test "Handles missing config files gracefully" {

@@ -18,16 +18,19 @@ Private key path: `/config/.ssh/id_rsa` (passphrase-less for unattended `shell_c
 4. Managed auth-line removal matches **key blob + wrapper path** (never
    comment-only deletes).
 5. Wrapper allowlists fixed ops only (`pi_firmware_check`, `pi_firmware_update`,
-   deploy helpers, `pi_firmware_uninstall`, `exit`) and never executes caller
-   stdin as a shell program.
-6. Re-running install refreshes host scripts and `authorized_keys` even when key
-   auth already works (includes legacy `bash -s` upgrade fallback).
+   `pi_firmware_uninstall`, `exit`) and never executes caller stdin as a shell
+   program. Deploy/upload ops are **not** allowlisted — install/refresh uses the
+   password bootstrap channel on port 22222.
+6. Re-running install refreshes host scripts and `authorized_keys` via password
+   bootstrap. Public keys are validated (non-empty typed blob) before any remote
+   mutation.
 7. Injects the Mobile Notification ID into the YAML files.
 
 ### `uninstall.sh` Logic
 
 1. Attempts host cleanup via `pi_firmware_uninstall` when the local private key
-   exists; if the key is missing or SSH fails, prints manual remediation steps
+   exists; if the key is missing or that call fails, attempts password-bootstrap
+   cleanup (SSH without `-i`). If both fail, prints manual remediation steps
    and records incomplete cleanup.
 2. Deletes local `/config/.ssh/id_rsa` and `id_rsa.pub` when present.
 3. Reverts mobile notification placeholders in the YAML files.

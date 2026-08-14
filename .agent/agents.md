@@ -25,6 +25,7 @@ Use for failing lint, tests, CI, or coverage.
 
 - Workflow: `.agent/workflows/fix.md`
 - Skill: `.github/skills/ha-firmware-fix-pass/SKILL.md`
+- Also for green validation: `.github/skills/pipeline-runner/SKILL.md`
 - Order: lint → tests → coverage ≥ 90% → badge if needed
 - Never loosen fail-closed firmware rules to green checks
 
@@ -63,3 +64,10 @@ Use for docs, release notes, and coverage badge synchronization.
 - Workflow: `.agent/workflows/release.md`
 - Skill: `.github/skills/release-doc-and-badge-update/SKILL.md`
 - Keep README/docs/agent files aligned with implementation
+
+## PR Comments Mode
+
+Use when resolving GitHub PR review threads.
+
+- Skill: `.github/skills/resolve-pr-comments/SKILL.md`
+- Verify each comment, fix or skip with a reply, then resolve (except Blocked)

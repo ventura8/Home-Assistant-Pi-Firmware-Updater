@@ -26,9 +26,7 @@ fi
 
 is_stdin_cmd() {
     case "$1" in
-        "bash -s" | "bash -s -- --update" | \
-            "pi_firmware_deploy_host_check" | "pi_firmware_deploy_wrapper" | \
-            "pi_firmware_deploy_auth")
+        "bash -s" | "bash -s -- --update")
             return 0
             ;;
         *)
@@ -62,8 +60,9 @@ if [ "$MOCK_SSH_AUTHORIZE_FAIL" == "true" ]; then
         echo "Mock SSH authorize/cleanup failed"
         exit 1
     fi
-    # Password-path mkdir/cat helpers also fail under authorize fail
-    if [[ "$REMOTE_CMD" == cat\>* ]] || [[ "$REMOTE_CMD" == mkdir\ * ]]; then
+    # Password-path mkdir/cat/chmod helpers also fail under authorize fail
+    if [[ "$REMOTE_CMD" == cat\ * ]] || [[ "$REMOTE_CMD" == cat* ]] \
+        || [[ "$REMOTE_CMD" == mkdir\ * ]] || [[ "$REMOTE_CMD" == chmod\ * ]]; then
         echo "Mock SSH authorize/cleanup failed"
         exit 1
     fi

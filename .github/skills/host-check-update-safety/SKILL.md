@@ -72,7 +72,7 @@ Stable tokens agents and YAML must continue to understand:
 | `eeprom_query_failed` | EEPROM query timed out or failed |
 | `eeprom_version_parse_error` | Could not parse EEPROM versions |
 
-Pi 3/4-family model match includes Raspberry Pi 3/4, Compute Module 3/4, and
+Pi 3/4-family model match includes Raspberry Pi 3/4, Compute Module 3/4/4S, and
 Pi 400 (`model_requires_boot_block`). Allowed boot classes include mmcblk, loop,
 and overlay paths; empty device classifies as unsupported.
 

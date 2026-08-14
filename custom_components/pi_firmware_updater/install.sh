@@ -27,6 +27,30 @@ get_key_blob() {
     awk '{print $2}' "$SSH_DIR/id_rsa.pub"
 }
 
+# Reject empty/malformed pubs before any remote authorized_keys mutation.
+validate_public_key() {
+    local line key_type blob
+    if [ ! -s "$SSH_DIR/id_rsa.pub" ]; then
+        echo "❌ ERROR: Public key file is missing or empty."
+        exit 1
+    fi
+    line=$(head -n 1 "$SSH_DIR/id_rsa.pub")
+    key_type=$(printf '%s\n' "$line" | awk '{print $1}')
+    blob=$(printf '%s\n' "$line" | awk '{print $2}')
+    case "$key_type" in
+        ssh-rsa | ssh-ed25519 | ecdsa-sha2-nistp256 | ecdsa-sha2-nistp384 | \
+            ecdsa-sha2-nistp521) ;;
+        *)
+            echo "❌ ERROR: Unsupported or malformed public key type."
+            exit 1
+            ;;
+    esac
+    if [ -z "$blob" ] || [ "${#blob}" -lt 32 ]; then
+        echo "❌ ERROR: Public key blob is missing or too short."
+        exit 1
+    fi
+}
+
 ssh_host() {
     local use_identity="$1"
     shift
@@ -39,20 +63,23 @@ ssh_host() {
     fi
 }
 
+# Password/bootstrap channel only (not the restricted integration key).
 replace_managed_auth_remote() {
-    local use_identity="$1"
-    local auth_line="$2"
-    local key_blob="$3"
+    local auth_line="$1"
+    local key_blob="$2"
+    local remote_script
 
-    ssh_host "$use_identity" "bash -s" << EOF
+    remote_script=$(
+        cat << EOF
 set -e
 mkdir -p ${WRAPPER_DIR} /root/.ssh
 chmod 700 ${WRAPPER_DIR} /root/.ssh
 touch /root/.ssh/authorized_keys
 chmod 600 /root/.ssh/authorized_keys
 awk -v blob='${key_blob}' -v wrap='${WRAPPER_PATH}' '
-  index(\$0, blob) && index(\$0, wrap) { next }
-  index(\$0, blob) { next }
+  blob != "" && index(\$0, blob) && index(\$0, wrap) { next }
+  blob != "" && index(\$0, blob) { next }
+  index(\$0, wrap) { next }
   { print }
 ' /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.tmp
 mv /root/.ssh/authorized_keys.tmp /root/.ssh/authorized_keys
@@ -63,6 +90,8 @@ chmod 600 /root/.ssh/authorized_keys
 printf '%s\n' '${key_blob}' > ${KEY_BLOB_PATH}
 chmod 600 ${KEY_BLOB_PATH}
 EOF
+    )
+    printf '%s\n' "$remote_script" | ssh_host no 'bash -s'
 }
 
 deploy_via_password() {
@@ -76,54 +105,12 @@ deploy_via_password() {
     ssh_host no "chmod 700 ${HOST_CHECK_PATH}" || return 1
     ssh_host no "cat > ${WRAPPER_PATH}" < "$WRAPPER_SRC" || return 1
     ssh_host no "chmod 700 ${WRAPPER_PATH}" || return 1
-    replace_managed_auth_remote no "$auth_line" "$key_blob" || return 1
-}
-
-deploy_via_restricted_key() {
-    local auth_line="$1"
-    local host_check="$CONFIG_DIR/host_check.sh"
-
-    ssh_host yes 'pi_firmware_deploy_host_check' < "$host_check" || return 1
-    ssh_host yes 'pi_firmware_deploy_wrapper' < "$WRAPPER_SRC" || return 1
-    printf '%s\n' "$auth_line" | ssh_host yes 'pi_firmware_deploy_auth' || return 1
-}
-
-deploy_via_legacy_bash_s() {
-    local auth_line="$1"
-    local key_blob="$2"
-    local host_check="$CONFIG_DIR/host_check.sh"
-    local host_b64 wrap_b64
-
-    host_b64=$(base64 -w 0 < "$host_check" 2> /dev/null || base64 < "$host_check" | tr -d '\n')
-    wrap_b64=$(base64 -w 0 < "$WRAPPER_SRC" 2> /dev/null || base64 < "$WRAPPER_SRC" | tr -d '\n')
-
-    ssh_host yes 'bash -s' << EOF
-set -e
-mkdir -p ${WRAPPER_DIR} /root/.ssh
-chmod 700 ${WRAPPER_DIR} /root/.ssh
-echo '${host_b64}' | base64 -d > ${HOST_CHECK_PATH}
-chmod 700 ${HOST_CHECK_PATH}
-echo '${wrap_b64}' | base64 -d > ${WRAPPER_PATH}
-chmod 700 ${WRAPPER_PATH}
-printf '%s\n' '${key_blob}' > ${KEY_BLOB_PATH}
-chmod 600 ${KEY_BLOB_PATH}
-touch /root/.ssh/authorized_keys
-chmod 600 /root/.ssh/authorized_keys
-awk -v blob='${key_blob}' -v wrap='${WRAPPER_PATH}' '
-  index(\$0, blob) && index(\$0, wrap) { next }
-  index(\$0, blob) { next }
-  { print }
-' /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.tmp
-mv /root/.ssh/authorized_keys.tmp /root/.ssh/authorized_keys
-cat >> /root/.ssh/authorized_keys <<'AUTH'
-${auth_line}
-AUTH
-chmod 600 /root/.ssh/authorized_keys
-EOF
+    replace_managed_auth_remote "$auth_line" "$key_blob" || return 1
 }
 
 authorize_key_on_host() {
     local auth_line key_blob
+    validate_public_key
     auth_line=$(build_authorized_keys_line)
     key_blob=$(get_key_blob)
 
@@ -137,28 +124,19 @@ authorize_key_on_host() {
     fi
 
     echo "⚡ Authorizing/refreshing restricted key on Host OS..."
+    echo "   (Bootstrap uses password auth on port ${SSH_PORT}; not the integration key.)"
     if ssh_host yes 'exit' 2> /dev/null; then
-        echo "ℹ️ SSH key auth works; refreshing host authorization..."
-        if deploy_via_restricted_key "$auth_line"; then
-            echo "✅ Authorization successful!"
-            return 0
-        fi
-        echo "ℹ️ Deploy commands unavailable; trying legacy bash -s upgrade path..."
-        if deploy_via_legacy_bash_s "$auth_line" "$key_blob"; then
-            echo "✅ Authorization successful!"
-            return 0
-        fi
-        echo "❌ ERROR: Could not refresh host authorization."
-        exit 1
+        echo "ℹ️ SSH key auth works; refreshing host files via password bootstrap..."
+    else
+        echo "Attempting to push restricted key to host via password bootstrap..."
     fi
 
-    echo "Attempting to push restricted key to host..."
     if deploy_via_password "$auth_line" "$key_blob"; then
         echo "✅ Authorization successful!"
         return 0
     fi
     echo "❌ ERROR: Could not authorize key."
-    echo "   Ensure 'HassOS SSH Port Configurator' is RUNNING."
+    echo "   Ensure 'HassOS SSH Port Configurator' is RUNNING with a password set."
     exit 1
 }
 

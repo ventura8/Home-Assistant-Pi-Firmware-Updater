@@ -154,19 +154,24 @@ YAML edit procedures: `.github/skills/ha-yaml-integration-edits/SKILL.md`.
   `restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh"`
   with key comment / marker `pi_firmware_updater`
 - The host wrapper allowlists only fixed ops: `pi_firmware_check`,
-  `pi_firmware_update`, `pi_firmware_deploy_*`, `pi_firmware_uninstall`, and
-  `exit` — never execute caller stdin as a shell program
+  `pi_firmware_update`, `pi_firmware_uninstall`, and `exit` — never execute
+  caller stdin as a shell program; never allowlist deploy/upload ops
+- Host file deployment and auth upsert use the **password bootstrap channel**
+  on port 22222 (separate from the restricted integration key)
 - Managed `authorized_keys` cleanup matches **key blob + wrapper path** (never
   comment-only deletion of unrelated admin keys)
 - Re-running install must refresh host `host_check.sh`, wrapper, and restricted
-  `authorized_keys` even when key auth already works
+  `authorized_keys` via password bootstrap
 - If `id_rsa` exists without `id_rsa.pub`, regenerate the pub via `ssh-keygen -y`
-  or abort before host authorization
-- Uninstall must attempt host cleanup even when the local private key is absent;
-  missing-key or failed SSH cleanup is incomplete: emit manual remediation and
-  exit non-zero while still continuing local key/YAML cleanup (safe to re-run)
-- Host cleanup (when key present) uses `pi_firmware_uninstall` **before** deleting
-  local keys
+  or abort before host authorization; reject empty/malformed pubs before remote
+  mutation
+- Uninstall must attempt host cleanup even when the local private key is absent
+  (try `pi_firmware_uninstall` when key present; otherwise/after failure try
+  password-bootstrap cleanup); missing-key or failed cleanup is incomplete:
+  emit manual remediation and exit non-zero while still continuing local
+  key/YAML cleanup (safe to re-run)
+- Host cleanup (when key present) prefers `pi_firmware_uninstall` **before**
+  deleting local keys
 - Mobile notify ID injection targets only intended placeholders in
   `update_notification.yaml` and `action_handler.yaml`
 - Uninstall reverts integration-owned notify actions; do not delete unrelated
@@ -206,11 +211,13 @@ Mode registry: `.agent/agents.md`
 | --- | --- |
 | Explore | `.agent/workflows/explore.md` |
 | Fix | `.agent/workflows/fix.md` + `ha-firmware-fix-pass` |
+| Pipeline | `.github/skills/pipeline-runner/SKILL.md` |
 | YAML Integration | `ha-yaml-integration-edits` |
 | Host Safety | `host-check-update-safety` |
 | Installer Maintenance | `install-uninstall-script-maintenance` |
 | Test Authoring | `bats-kcov-test-authoring` |
 | Release | `.agent/workflows/release.md` + `release-doc-and-badge-update` |
+| PR comments | `.github/skills/resolve-pr-comments/SKILL.md` |
 
 Skills index: `.github/skills/README.md`
 

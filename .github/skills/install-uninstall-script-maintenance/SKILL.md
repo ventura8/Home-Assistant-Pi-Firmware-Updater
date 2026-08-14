@@ -27,7 +27,9 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
 - Never append a bare unrestricted pubkey to host `authorized_keys`
 - Host forced-command wrapper must allowlist only fixed integration commands and
   must never execute caller stdin as a shell program
+- Never allowlist deploy/upload ops on the permanent integration key
 - Managed `authorized_keys` removal matches key blob + wrapper path only
+- Install/refresh host file deployment uses password bootstrap only
 
 ## Install Expectations
 
@@ -39,20 +41,24 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
 3. Deploy host `host_check.sh` + `ssh_wrapper.sh` under
    `/root/.pi_firmware_updater/` and upsert restricted `authorized_keys`:
    `restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh" ...`
+   Deployment uses the **password bootstrap channel** on port 22222 (not the
+   restricted integration key). The wrapper allowlist must never include deploy
+   or stdin-exec operations.
 4. Wrapper allowlist: `pi_firmware_check`, `pi_firmware_update`,
-   `pi_firmware_deploy_*`, `pi_firmware_uninstall`, `exit`
-5. Refresh host scripts + auth on every install run (including when key auth
-   already works); keep a legacy `bash -s` upgrade fallback for older wrappers
+   `pi_firmware_uninstall`, `exit` only
+5. Refresh host scripts + auth on every install run via password bootstrap
 6. Prompt for or accept `notify.mobile_app_*` ID and inject into YAML placeholders
 7. Print clear terminal guidance for HAOS SSH add-on prerequisites
 
 ## Uninstall Expectations
 
 1. Always treat host cleanup as a tracked outcome:
-   - If local private key exists, run `pi_firmware_uninstall` over SSH before
-     deleting local keys
-   - If the key is absent or SSH fails, emit manual remediation instructions and
-     mark cleanup incomplete (non-zero)
+   - If local private key exists, run `pi_firmware_uninstall` over SSH first
+   - If that fails **or** the key is absent, attempt password-bootstrap cleanup
+     (SSH without `-i`) that strips wrapper-path `authorized_keys` lines and
+     removes `/root/.pi_firmware_updater/`
+   - If both attempts fail, emit manual remediation instructions and mark
+     cleanup incomplete (non-zero)
 2. Continue local cleanup regardless (remove local keys when present; revert
    notify placeholders)
 3. Exit non-zero when host cleanup was incomplete; remain safe to re-run
