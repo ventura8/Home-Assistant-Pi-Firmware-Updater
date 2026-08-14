@@ -2,13 +2,15 @@
 
 ## Goals
 
-The primary goal of this project is to provide a safe, automated, and user-friendly way to update Raspberry Pi firmware from Home Assistant. It bridges the gap between the Home Assistant container and the Raspberry Pi Host OS using secure SSH communication.
+The primary goal of this project is to provide a safe, automated, and user-friendly way to update Raspberry Pi firmware from Home Assistant. It bridges the gap between the Home Assistant container and the Raspberry Pi Host OS using restricted SSH communication on port 22222 (`from="127.0.0.1"` plus a forced-command wrapper allowlisting only the integration host-check flows).
 
 ## Directory Structure
 
 - `custom_components/pi_firmware_updater/`: Core integration files.
-  - `install.sh`: Setup script for SSH keys and configuration.
-  - `uninstall.sh`: Cleanup script.
+  - `install.sh`: Setup script for restricted SSH keys/wrapper and configuration.
+  - `uninstall.sh`: Cleanup script (host auth + local keys).
+  - `ssh_wrapper.sh`: Host forced-command allowlist (deployed to the Host OS).
+  - `manifest.json`: HACS/integration metadata (includes release `version`).
   - `host_check.sh`: Shell script for host-side block detection and update execution.
   - `command_line_sensors.yaml`: Sensor definitions.
   - `template_sensors.yaml`: Template sensor definitions.

@@ -1,21 +1,70 @@
 #!/bin/bash
 # Mock ssh
 # Usage: ssh [options] [user@]hostname [command]
+#
+# Captures remote command and stdin for test assertions.
+# MOCK_SSH_LOG  - if set, append a log line for each invocation
+# MOCK_SSH_STDIN_LOG - if set, append stdin payload for bash -s / deploy cmds
 
-# If MOCK_SSH_FAIL is set, always fail
+MOCK_DIR="${MOCK_SSH_STATE_DIR:-/tmp/mock_ssh_state}"
+mkdir -p "$MOCK_DIR"
+
+LAST_ARG="${*: -1}"
+REMOTE_CMD="$LAST_ARG"
+
+USED_IDENTITY="no"
+for arg in "$@"; do
+    if [ "$arg" = "-i" ]; then
+        USED_IDENTITY="yes"
+        break
+    fi
+done
+
+if [ -n "${MOCK_SSH_LOG:-}" ]; then
+    echo "identity=${USED_IDENTITY} cmd=${REMOTE_CMD}" >> "$MOCK_SSH_LOG"
+fi
+
+is_stdin_cmd() {
+    case "$1" in
+        "bash -s" | "bash -s -- --update" | \
+            "pi_firmware_deploy_host_check" | "pi_firmware_deploy_wrapper" | \
+            "pi_firmware_deploy_auth")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+if is_stdin_cmd "$REMOTE_CMD"; then
+    if [ -n "${MOCK_SSH_STDIN_LOG:-}" ]; then
+        cat >> "$MOCK_SSH_STDIN_LOG"
+    else
+        cat > /dev/null
+    fi
+fi
+
 if [ "$MOCK_SSH_FAIL" == "true" ]; then
     echo "Mock SSH failed (global)"
     exit 1
 fi
 
-# Check for specific failure mode: Fail only the connection check ('exit')
-# The command is the last argument.
-# We can iterate to find it.
-LAST_ARG="${@: -1}"
-
 if [ "$MOCK_SSH_CONNECTION_CHECK_FAIL" == "true" ]; then
-    if [[ "$LAST_ARG" == "exit" ]]; then
+    if [[ "$REMOTE_CMD" == "exit" ]]; then
         echo "Mock SSH connection check failed"
+        exit 1
+    fi
+fi
+
+if [ "$MOCK_SSH_AUTHORIZE_FAIL" == "true" ]; then
+    if is_stdin_cmd "$REMOTE_CMD" || [[ "$REMOTE_CMD" == "pi_firmware_uninstall" ]]; then
+        echo "Mock SSH authorize/cleanup failed"
+        exit 1
+    fi
+    # Password-path mkdir/cat helpers also fail under authorize fail
+    if [[ "$REMOTE_CMD" == cat\>* ]] || [[ "$REMOTE_CMD" == mkdir\ * ]]; then
+        echo "Mock SSH authorize/cleanup failed"
         exit 1
     fi
 fi

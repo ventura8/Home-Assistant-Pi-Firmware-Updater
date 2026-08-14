@@ -1,12 +1,11 @@
 ---
-# Runs host_check.sh remotely over SSH; output is normalized to a single line with tr
+# Runs host_check.sh on the host via fixed SSH forced-command
 - sensor:
     name: "Pi Firmware Raw"
     unique_id: pi_firmware_raw
     command: >-
       ssh -p 22222 -o StrictHostKeyChecking=no -i /config/.ssh/id_rsa
-      root@127.0.0.1 'bash -s'
-      < /config/custom_components/pi_firmware_updater/host_check.sh
+      root@127.0.0.1 'pi_firmware_check'
       | tr '\n' ' '
     value_template: "{{ value }}"
     scan_interval: 86400
