@@ -13,9 +13,10 @@ Mode routing: `.agent/agents.md`.
 | `host-check-update-safety` | `host_check.sh` feasibility, blocks, `--update`, reboot chaining |
 | `install-uninstall-script-maintenance` | SSH setup, key auth, mobile ID injection, uninstall rollback |
 | `bats-kcov-test-authoring` | New/updated Bats suites, mocks, kcov, 90% coverage bar |
-| `release-doc-and-badge-update` | README/docs/releases sync and coverage badge refresh |
+| `release-doc-and-badge-update` | README/docs/releases sync, coverage badge refresh, and cutting the `vX.Y.Z` tag/GitHub Release |
 | `resolve-pr-comments` | Resolve GitHub PR review threads with verify → fix/skip → reply → resolve |
 | `pipeline-runner` | Full local CI-parity pipeline (lint, Bats, kcov ≥ 90%, badge) with live logs |
+| `runtime-troubleshooting` | Diagnose a live install (SSH auth, stuck sensors, silent updates) before routing to a fix skill |
 
 ## Trigger Hints
 
@@ -30,6 +31,8 @@ Mode routing: `.agent/agents.md`.
   (badge+docs together → also `release-doc-and-badge-update`)
 - PR review threads / “resolve comments” → `resolve-pr-comments`
 - “run pipeline” / local CI parity → `pipeline-runner`
+- Live install misbehaving (permission denied, stuck sensor, silent update) →
+  `runtime-troubleshooting`
 
 ## Related Workflows
 

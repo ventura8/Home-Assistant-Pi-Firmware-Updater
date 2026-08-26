@@ -85,7 +85,8 @@ and overlay paths; empty device classifies as unsupported.
    in the same change set
 4. Add or update Bats coverage for both success and blocked/fail-closed paths
 5. Run `./tests/run_tests.sh lint` then `./scripts/run_local_tests.ps1`
-6. If user-visible block reasons or UX change, update README/docs and agent docs
+6. Update all relevant Markdown in the same change set (see `AGENTS.md`).
+   For user-visible block reasons or UX changes, include README, `docs/`, and skills.
 
 ## Regression Checklist
 

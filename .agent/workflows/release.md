@@ -39,10 +39,29 @@ If rules, workflows, or invariants changed:
 3. Update `.agent/workflows/*` / `.agent/agents.md` as needed
 4. Keep Copilot sidecars accurate as thin summaries (no conflicting forks)
 
-## 5. Acceptance
+## 5. Cut the Tag and GitHub Release
+
+1. Confirm everything above is committed and green (lint, tests, coverage,
+   badge, docs).
+2. Write `docs/releases/vX.Y.Z_github_description.md` (H1 title, key changes,
+   `Full Changelog` compare link against the previous tag).
+3. Commit the GitHub Release description file so the release tree is clean.
+4. Re-run the quality gates on a clean working tree (`./tests/run_tests.sh lint`,
+   then `./scripts/run_local_tests.ps1` when coverage or badge may have moved).
+5. Create an annotated local tag named `v` + the `manifest.json` `"version"`
+   value (for example version `1.0.4` → tag `v1.0.4`), pointing at the commit
+   that contains the finalized release description.
+6. **Stop and ask before publishing** — pushing the tag and running
+   `gh release create` are visible to others and hard to undo. Only do so
+   after the user explicitly confirms.
+
+## 6. Acceptance
 
 - Docs match implementation
 - No stale release claims
 - Lint + local tests green
-- Badge and agent docs current
+- Badge and all relevant Markdown current
+- `vX.Y.Z_github_description.md` present with a working compare link
+- Tag name is `v` + `manifest.json` `"version"`; tag/release only pushed after
+  confirmation
 - Summarize migration/operational impact for maintainers

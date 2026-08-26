@@ -10,6 +10,10 @@ Project law: root `AGENTS.md`. Skills index: `.github/skills/README.md`.
 Pick a mode from the user request, then follow the linked workflow and/or skill.
 Do not skip safety or quality gates listed in `AGENTS.md`.
 
+**On every task:** before finishing, update all relevant Markdown files in the
+same change set (see “Always Update Relevant Markdown” in `AGENTS.md`) — agent
+sidecars, skills, workflows, README, and `docs/` as applicable.
+
 ## Explore Mode
 
 Use for architecture discovery, file tracing, and impact analysis.
@@ -71,3 +75,12 @@ Use when resolving GitHub PR review threads.
 
 - Skill: `.github/skills/resolve-pr-comments/SKILL.md`
 - Verify each comment, fix or skip with a reply, then resolve (except Blocked)
+
+## Runtime Troubleshooting Mode
+
+Use when a user reports a live install misbehaving (SSH auth, stuck sensor,
+silent update) and the fix location is not yet known.
+
+- Skill: `.github/skills/runtime-troubleshooting/SKILL.md`
+- Diagnose first, then hand off to Host Safety / YAML Integration / Installer
+  Maintenance mode once root cause is known — do not patch ad hoc mid-diagnosis

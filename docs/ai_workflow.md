@@ -3,7 +3,7 @@
 This document outlines the mandatory workflow for AI agents contributing to this project. Follow these rules to ensure code quality, coverage, and cross-platform compatibility.
 
 > [!IMPORTANT]
-> **Single source of truth:** Root [`AGENTS.md`](../AGENTS.md) is the always-on project law (quality gates, firmware safety invariants, HA contracts, install rules, and mandatory agent-doc updates). This file is a short workflow summary; if anything conflicts, follow `AGENTS.md` and the matching skill under `.github/skills/`.
+> **Single source of truth:** Root [`AGENTS.md`](../AGENTS.md) is the always-on project law (quality gates, firmware safety invariants, HA contracts, install rules, and mandatory Markdown updates on every task). This file is a short workflow summary; if anything conflicts, follow `AGENTS.md` and the matching skill under `.github/skills/`.
 
 ## 1. Smart Single-Pass Fixes
 
@@ -14,7 +14,7 @@ When a user requests fixes for a file (or set of files), you must address **both
 >
 > **Skill Shortcut**: `.github/skills/ha-firmware-fix-pass/SKILL.md`
 >
-> **Modes**: `.agent/agents.md` (Explore / Fix / YAML / Host Safety / Installer / Test / Release)
+> **Modes**: `.agent/agents.md` (Explore / Fix / YAML / Host Safety / Installer / Test / Release / PR comments / Runtime Troubleshooting)
 
 ### Order of Operations
 
@@ -44,8 +44,11 @@ The development environment is mixed (Windows/Linux).
 
 ## 4. Documentation and Agent Docs
 
-* Keep `docs/Instructions.md` and `README.md` up to date if workflows change.
-* When rules, safety behavior, or procedures change, update `AGENTS.md` and the relevant skill/workflow in the **same change set** (see “Always Update Agent Docs” in `AGENTS.md`).
+* **Every task:** before finishing, update all relevant Markdown in the same
+  change set — `AGENTS.md`, agent sidecars, skills, workflows, `README.md`, and
+  `docs/` as applicable (see “Always Update Relevant Markdown” in `AGENTS.md`).
+* Keep `docs/Instructions.md` and release notes current when versions or
+  workflows change.
 
 ## 5. Style and Suppression Rules
 

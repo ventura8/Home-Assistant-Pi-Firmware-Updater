@@ -23,7 +23,8 @@ Operational playbook for single-pass lint → test → coverage repair. Project 
 - Never loosen fail-closed firmware safety to make tests green
 - Keep fixing until lint, tests, and coverage ≥ 90% all pass
 - Prefer focused edits; avoid unrelated refactors on fix-only requests
-- Update agent docs in the same change set when invariants or workflows change
+- On every task, update all relevant Markdown in the same change set (see
+  “Always Update Relevant Markdown” in `AGENTS.md`)
 
 ## Procedure
 
@@ -65,7 +66,7 @@ Operational playbook for single-pass lint → test → coverage repair. Project 
 - [ ] Coverage ≥ 90% and badge current when coverage moved
 - [ ] Fail-closed / blocked update behavior unchanged unless the bug fix required
       an intentional, tested safety change
-- [ ] Agent docs updated if rules or workflows changed
+- [ ] All relevant Markdown updated in the same change set
 
 ## Do / Don’t
 

@@ -11,7 +11,9 @@ When working in this repository, follow root `AGENTS.md`.
 5. Run lint checks before test fixes
 6. Preserve Home Assistant integration contracts
 7. Keep fixing until lint, tests, and coverage ≥ 90% are green
-8. Update agent docs when invariants or workflows change
+8. On every task, update all relevant Markdown in the same change set — agent
+   sidecars, skills, workflows, README, and `docs/` (see “Always Update Relevant
+   Markdown” in `AGENTS.md`)
 
 ## Prompt Library
 

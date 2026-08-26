@@ -42,9 +42,12 @@ Aligned with `.github/skills/ha-firmware-fix-pass/SKILL.md` and `AGENTS.md`.
 
 1. Re-run lint and full local tests after each substantive fix batch.
 2. Treat every remaining lint/test/coverage failure as blocking.
-3. Update agent docs in the same change set if workflows or invariants changed.
+3. Update all relevant Markdown in the same change set before finishing (see
+   “Always Update Relevant Markdown” in `AGENTS.md`).
 
 ## 5. Final Check
 
 - Lint clean, tests green, coverage ≥ 90%, badge current when required
+- All relevant Markdown updated (agent sidecars, skills, workflows, README,
+  `docs/`)
 - Summarize changes, risks, and any safety-contract impact

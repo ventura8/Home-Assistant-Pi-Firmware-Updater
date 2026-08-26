@@ -18,7 +18,7 @@ The detailed documentation has been split into multiple files for easier navigat
   - Agent workflow summary; defers full law to `AGENTS.md`.
 - [Release Descriptions](releases)
   - GitHub-ready release/PR description markdown for each release commit.
-  - Latest: [v1.0.3](releases/v1.0.3.md)
+  - Latest: [v1.0.4](releases/v1.0.4.md)
 
 ## Agent Skills
 
@@ -28,6 +28,7 @@ Project-specific Copilot agent skills are available under `.github/skills/`:
 - `ha-yaml-integration-edits`: Safe edits for Home Assistant YAML integration files.
 - `host-check-update-safety`: Safety-critical host check and firmware update guard logic.
 - `install-uninstall-script-maintenance`: Installer/uninstaller SSH and rollback behavior.
+- `runtime-troubleshooting`: Live install diagnosis before routing to a fix skill.
 - `bats-kcov-test-authoring`: Bats test authoring and kcov coverage workflows.
 - `release-doc-and-badge-update`: Release docs and coverage badge synchronization.
 
