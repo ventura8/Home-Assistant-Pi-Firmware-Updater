@@ -31,7 +31,9 @@ and update. Full always-on law: root `AGENTS.md`. Do not conflict with it.
 - Preserve `sensor.pi_firmware_monitor`, `INSTALL_PI_FIRMWARE`,
   `update_blocked`, `blocked_reason`
 - SSH host access on port 22222 with RSA keys
-- Update agent docs in the same change set when rules/behavior change
+- On every task, update all relevant Markdown in the same change set — agent
+  sidecars, skills, workflows, README, and `docs/` (see “Always Update Relevant
+  Markdown” in `AGENTS.md`)
 
 ## Agent Routing
 

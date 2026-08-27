@@ -27,3 +27,4 @@ Follow root `AGENTS.md`. For `host_check.sh` use
 1. `./tests/run_tests.sh lint`
 2. `./scripts/run_local_tests.ps1`
 3. Coverage ≥ 90%; update `assets/coverage.svg` when coverage changes
+4. Update all relevant Markdown before finishing (see `AGENTS.md`)

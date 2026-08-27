@@ -29,4 +29,4 @@ Follow root `AGENTS.md` and
 2. Relevant component/e2e tests via `./scripts/run_local_tests.ps1`
 3. Confirm total coverage ≥ 90%; refresh `assets/coverage.svg` when coverage
    changes
-4. Update README/docs when user-visible behavior changes
+4. Update all relevant Markdown before finishing (see `AGENTS.md`)

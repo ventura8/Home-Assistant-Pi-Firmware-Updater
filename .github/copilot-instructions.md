@@ -10,7 +10,8 @@ Modes: [`.agent/agents.md`](../.agent/agents.md).
 - Strict mandatory quality gates in local and CI
 - No lint suppressions or disables
 - Preserve Home Assistant integration entity/service/action contracts
-- Update agent docs when rules or behavior change
+- On every task, update all relevant Markdown in the same change set (see
+  “Always Update Relevant Markdown” in `AGENTS.md`)
 
 ## Required Validation Sequence
 

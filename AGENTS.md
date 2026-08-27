@@ -189,19 +189,26 @@ Procedures: `.github/skills/install-uninstall-script-maintenance/SKILL.md`.
    `./scripts/run_local_tests.ps1` succeed with coverage ≥ 90%
 5. Prefer focused edits over broad refactors on fix-only requests
 
-## Always Update Agent Docs
+## Always Update Relevant Markdown
 
-**Mandatory on every change** that alters project rules, workflows, safety
-behavior, HA contracts, install semantics, or validation commands:
+**Mandatory on every task** — before finishing work, update every Markdown file
+that the change touches or that would otherwise become stale. Treat missing doc
+updates as incomplete work (same as missing tests or a stale coverage badge).
 
-- Update root `AGENTS.md` when law/invariants change
-- Update the relevant skill under `.github/skills/*/SKILL.md`
-- Update workflows under `.agent/workflows/` when the procedure changes
-- Update thin sidecars only when routing or short summaries would otherwise lie
+Update as applicable in the **same change set**:
 
-Treat stale agent docs as incomplete work (same as missing tests or a stale
-coverage badge). Capture new invariants, failure modes, preferred commands, and
-do/don’t lessons — not a changelog dump.
+- **Project law and agent routing:** root `AGENTS.md`; sidecars (`CLAUDE.md`,
+  `.github/copilot-instructions.md`, `.github/agents/project.agent.md`,
+  `.github/instructions/*.md`, `.github/prompts/project.prompt.md`,
+  `.agent/agents.md`)
+- **Procedures:** `.agent/workflows/*.md` and matching
+  `.github/skills/*/SKILL.md`
+- **Human docs:** `README.md`, `docs/Instructions.md`, other `docs/*.md`, and
+  `docs/releases/*` when behavior, setup, versions, or release notes change
+
+Capture new invariants, failure modes, preferred commands, and do/don’t
+lessons — not a changelog dump. Do not leave stale version strings, routing
+tables, or procedure steps.
 
 ## Agent Modes and Skills
 
@@ -218,6 +225,7 @@ Mode registry: `.agent/agents.md`
 | Test Authoring | `bats-kcov-test-authoring` |
 | Release | `.agent/workflows/release.md` + `release-doc-and-badge-update` |
 | PR comments | `.github/skills/resolve-pr-comments/SKILL.md` |
+| Runtime Troubleshooting | `.github/skills/runtime-troubleshooting/SKILL.md` |
 
 Skills index: `.github/skills/README.md`
 
@@ -234,3 +242,5 @@ Skills index: `.github/skills/README.md`
 
 - Lint and format gate: `./tests/run_tests.sh lint`
 - Full local validation: `./scripts/run_local_tests.ps1`
+- GitHub Release on tag push: `.github/workflows/release.yml` (notes from
+  `docs/releases/vX.Y.Z_github_description.md`)

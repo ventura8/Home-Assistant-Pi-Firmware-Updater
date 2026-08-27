@@ -1,0 +1,100 @@
+---
+name: Publish GitHub Release
+
+'on':
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (for example v1.0.4)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve tag
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "Tag must look like vX.Y.Z (got: $TAG)" >&2
+              exit 1
+              ;;
+          esac
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+            echo "notes_file=docs/releases/${TAG}_github_description.md"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tagged commit
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ steps.meta.outputs.tag }}
+          persist-credentials: false
+
+      - name: Validate release inputs
+        id: notes
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          NOTES_FILE="${{ steps.meta.outputs.notes_file }}"
+
+          MANIFEST_VERSION=$(python3 -c \
+            "import json; print(json.load(open('custom_components/pi_firmware_updater/manifest.json'))['version'])")
+          if [ "$MANIFEST_VERSION" != "$VERSION" ]; then
+            echo "Tag $TAG does not match manifest.json version $MANIFEST_VERSION" >&2
+            exit 1
+          fi
+
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "Missing release notes file: $NOTES_FILE" >&2
+            exit 1
+          fi
+
+          TITLE=$(python3 - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path(os.environ["NOTES_FILE"])
+          for line in path.read_text(encoding="utf-8").splitlines():
+              stripped = line.strip()
+              if stripped.startswith("# "):
+                  print(stripped[2:].strip())
+                  break
+          else:
+              raise SystemExit(f"No H1 title found in {path}")
+          PY
+          )
+          {
+            echo "title<<EOF"
+            echo "$TITLE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          NOTES_FILE: ${{ steps.meta.outputs.notes_file }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.notes.outputs.title }}
+          body_path: ${{ steps.meta.outputs.notes_file }}
+          draft: false
+          prerelease: false
+          make_latest: true

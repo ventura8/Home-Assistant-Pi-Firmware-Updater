@@ -74,7 +74,8 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
    `tests/component/uninstall_test.bats` (and e2e if workflow-visible)
 5. Run lint + `./scripts/run_local_tests.ps1`
 6. Update README / docs when user-facing setup steps change
-7. Update agent docs when install invariants change
+7. Update all relevant Markdown in the same change set before finishing (see
+   `AGENTS.md`)
 
 ## Regression Checklist
 

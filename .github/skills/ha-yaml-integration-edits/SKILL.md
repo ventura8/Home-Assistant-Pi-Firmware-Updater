@@ -76,7 +76,8 @@ Do not rename without migration + docs + tests:
 6. Confirm total coverage ≥ 90%; refresh `assets/coverage.svg` when coverage
    changes
 7. Update README/docs when user-visible behavior changes
-8. Update agent docs if contracts or UX invariants change
+8. Update all relevant Markdown in the same change set before finishing (see
+   `AGENTS.md`)
 
 ## Regression Checklist
 

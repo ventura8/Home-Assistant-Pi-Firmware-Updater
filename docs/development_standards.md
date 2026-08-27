@@ -5,6 +5,19 @@
 - **Threshold:** Minimum **90%** coverage for all Bash scripts.
 - **Enforcement:** The CI pipeline (`test.yml`) will fail if coverage falls below 90%.
 
+## GitHub Releases
+
+Pushing an annotated `vX.Y.Z` tag runs `.github/workflows/release.yml`, which:
+
+1. Checks out that tag and verifies `manifest.json` `"version"` matches `X.Y.Z`.
+2. Requires `docs/releases/vX.Y.Z_github_description.md`.
+3. Publishes a GitHub Release whose title is the file’s H1 and whose body is
+   the file contents.
+
+To backfill an existing tag: Actions → **Publish GitHub Release** → Run workflow
+(or `gh workflow run release.yml -f tag=vX.Y.Z`). Coverage badges are still
+updated only locally — not by this workflow.
+
 ## Local Development Workflow
 
 Coverage badges are **not** updated by the CI pipeline. They must be updated locally before committing changes.

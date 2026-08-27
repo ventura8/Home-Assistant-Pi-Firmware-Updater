@@ -15,7 +15,8 @@ Full law: root `AGENTS.md`. Modes: `.agent/agents.md`. Skills:
   stable
 - Enforce mandatory lint, format, test, and coverage quality gates
 - Keep install/uninstall idempotent and non-destructive outside owned state
-- Update agent docs when rules or behavior change
+- On every task, update all relevant Markdown in the same change set (see
+  “Always Update Relevant Markdown” in `AGENTS.md`)
 
 ## Hard Constraints
 
@@ -36,6 +37,7 @@ Full law: root `AGENTS.md`. Modes: `.agent/agents.md`. Skills:
 | `install.sh` / `uninstall.sh` | `install-uninstall-script-maintenance` |
 | Bats / kcov | `bats-kcov-test-authoring` |
 | Docs / badge / release notes | `release-doc-and-badge-update` |
+| Live install misbehaving | `runtime-troubleshooting` |
 
 ## Verification Standard
 
