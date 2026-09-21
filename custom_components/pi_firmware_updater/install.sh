@@ -44,8 +44,10 @@ validate_public_key() {
         echo "❌ ERROR: Public key file must contain exactly one key line (found ${record_count})."
         exit 1
     fi
-    PUB_KEY_TYPE=$(awk 'NR == 1 { print $1; exit }' "$SSH_DIR/id_rsa.pub")
-    PUB_KEY_BLOB=$(awk 'NR == 1 { print $2; exit }' "$SSH_DIR/id_rsa.pub")
+    # Exactly one non-blank record exists at this point; parse that record
+    # (not line 1) so leading blank lines cannot desync count vs. fields.
+    PUB_KEY_TYPE=$(awk 'NF { print $1; exit }' "$SSH_DIR/id_rsa.pub")
+    PUB_KEY_BLOB=$(awk 'NF { print $2; exit }' "$SSH_DIR/id_rsa.pub")
     case "$PUB_KEY_TYPE" in
         ssh-rsa | ssh-ed25519 | ecdsa-sha2-nistp256 | ecdsa-sha2-nistp384 | \
             ecdsa-sha2-nistp521) ;;

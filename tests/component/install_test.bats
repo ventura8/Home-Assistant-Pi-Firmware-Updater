@@ -111,6 +111,19 @@ seed_existing_key() {
     [ ! -f "$MOCK_SSH_STDIN_LOG" ]
 }
 
+@test "Accepts a single key record surrounded by blank lines" {
+    touch /config/.ssh/id_rsa
+    printf '\n%s\n\n' \
+        "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" \
+        > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Authorization successful"* ]]
+    grep -q 'ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater' "$MOCK_SSH_STDIN_LOG"
+}
+
 @test "Rejects public key blob with non-base64 characters" {
     touch /config/.ssh/id_rsa
     echo "ssh-rsa AAAAMOCKKEY'DATASTRINGWITHQUOTEANDLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
