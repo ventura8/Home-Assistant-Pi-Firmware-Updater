@@ -22,8 +22,12 @@ Private key path: `/config/.ssh/id_rsa` (passphrase-less for unattended `shell_c
    program. Deploy/upload ops are **not** allowlisted — install/refresh uses the
    password bootstrap channel on port 22222.
 6. Re-running install refreshes host scripts and `authorized_keys` via password
-   bootstrap. Public keys are validated (non-empty typed blob) before any remote
-   mutation.
+   bootstrap. Public keys are validated before any remote mutation: the file
+   must hold exactly one record with a supported key type and a base64 blob of
+   at least 32 characters. Only the validated type + blob are used to build the
+   restricted `authorized_keys` line, so extra lines in `id_rsa.pub` (e.g.
+   planted by another component with `/config` write access) are rejected
+   instead of being appended to the host as unrestricted entries.
 7. Injects the Mobile Notification ID into the YAML files.
 
 ### `uninstall.sh` Logic

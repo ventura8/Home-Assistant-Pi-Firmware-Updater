@@ -165,6 +165,10 @@ YAML edit procedures: `.github/skills/ha-yaml-integration-edits/SKILL.md`.
 - If `id_rsa` exists without `id_rsa.pub`, regenerate the pub via `ssh-keygen -y`
   or abort before host authorization; reject empty/malformed pubs before remote
   mutation
+- `id_rsa.pub` must contain **exactly one** key record (supported type, base64
+  blob ≥ 32 chars). The host `authorized_keys` line and stored key blob are
+  built only from the validated type/blob fields — never from raw file contents,
+  so a planted second line can never become an unrestricted root key
 - Uninstall must attempt host cleanup even when the local private key is absent
   (try `pi_firmware_uninstall` when key present; otherwise/after failure try
   password-bootstrap cleanup); missing-key or failed cleanup is incomplete:

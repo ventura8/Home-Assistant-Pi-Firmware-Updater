@@ -97,6 +97,55 @@ seed_existing_key() {
         || [[ "$output" == *"Public key blob is missing"* ]]
 }
 
+@test "Rejects multi-line public key before any host mutation" {
+    touch /config/.ssh/id_rsa
+    printf '%s\n%s\n' \
+        "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" \
+        "ssh-rsa AAAAMOCKPLANTEDATTACKERKEYDATASTRINGWITHLENGTH attacker" \
+        > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"exactly one key line"* ]]
+    [ ! -f "$MOCK_SSH_STDIN_LOG" ]
+}
+
+@test "Rejects public key blob with non-base64 characters" {
+    touch /config/.ssh/id_rsa
+    echo "ssh-rsa AAAAMOCKKEY'DATASTRINGWITHQUOTEANDLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid characters"* ]]
+    [ ! -f "$MOCK_SSH_STDIN_LOG" ]
+}
+
+@test "Rejects unsupported public key type" {
+    touch /config/.ssh/id_rsa
+    echo "ssh-dss AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Unsupported or malformed public key type"* ]]
+    [ ! -f "$MOCK_SSH_STDIN_LOG" ]
+}
+
+@test "Pushes exactly one restricted authorized_keys entry built from validated fields" {
+    seed_existing_key
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -eq 0 ]
+    run sed -n "/<<'AUTH'/,/^AUTH$/p" "$MOCK_SSH_STDIN_LOG"
+    [ "$(printf '%s\n' "$output" | wc -l)" -eq 3 ]
+    expected='restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh"'
+    expected="$expected ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater"
+    [[ "$output" == *"$expected"* ]]
+}
+
 @test "Handles SSH Authorization Failure" {
     export MOCK_SSH_FAIL="true"
     export MOBILE_ID="notify.test"
