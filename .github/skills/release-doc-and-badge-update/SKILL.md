@@ -16,7 +16,7 @@ version tag/GitHub release. Project law: `AGENTS.md`. Workflow entry:
 - Coverage changed and badge or release notes may be stale
 - Preparing final change set for merge or release tagging
 - Cutting the `vX.Y.Z` tag / GitHub Release once `manifest.json` version and
-  docs are ready (existing tags: `v1.0.0`–`v1.0.3`, one per released
+  docs are ready (existing tags: `v1.0.0`–`v1.0.4`, one per released
   `manifest.json` version)
 
 ## Hard Rules

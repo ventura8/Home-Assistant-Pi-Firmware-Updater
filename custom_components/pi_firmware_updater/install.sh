@@ -16,28 +16,39 @@ SSH_PORT=22222
 SSH_TARGET="root@127.0.0.1"
 WRAPPER_SRC="${CONFIG_DIR}/ssh_wrapper.sh"
 
+# Validated public key fields (set by validate_public_key). Host authorization
+# is built ONLY from these, never from the raw id_rsa.pub contents.
+PUB_KEY_TYPE=""
+PUB_KEY_BLOB=""
+
 build_authorized_keys_line() {
-    local pub_key
-    pub_key=$(awk '{print $1" "$2}' "$SSH_DIR/id_rsa.pub")
-    printf 'restrict,from="127.0.0.1",command="%s" %s %s\n' \
-        "$WRAPPER_PATH" "$pub_key" "$KEY_COMMENT"
+    printf 'restrict,from="127.0.0.1",command="%s" %s %s %s\n' \
+        "$WRAPPER_PATH" "$PUB_KEY_TYPE" "$PUB_KEY_BLOB" "$KEY_COMMENT"
 }
 
 get_key_blob() {
-    awk '{print $2}' "$SSH_DIR/id_rsa.pub"
+    printf '%s\n' "$PUB_KEY_BLOB"
 }
 
-# Reject empty/malformed pubs before any remote authorized_keys mutation.
+# Reject empty/malformed/multi-record pubs before any remote authorized_keys
+# mutation. Exactly one key record is allowed: a second line would otherwise be
+# appended to the host as a separate, unrestricted authorized_keys entry.
 validate_public_key() {
-    local line key_type blob
+    local record_count
     if [ ! -s "$SSH_DIR/id_rsa.pub" ]; then
         echo "❌ ERROR: Public key file is missing or empty."
         exit 1
     fi
-    line=$(head -n 1 "$SSH_DIR/id_rsa.pub")
-    key_type=$(printf '%s\n' "$line" | awk '{print $1}')
-    blob=$(printf '%s\n' "$line" | awk '{print $2}')
-    case "$key_type" in
+    record_count=$(grep -c '[^[:space:]]' "$SSH_DIR/id_rsa.pub" || true)
+    if [ "$record_count" -ne 1 ]; then
+        echo "❌ ERROR: Public key file must contain exactly one key line (found ${record_count})."
+        exit 1
+    fi
+    # Exactly one non-blank record exists at this point; parse that record
+    # (not line 1) so leading blank lines cannot desync count vs. fields.
+    PUB_KEY_TYPE=$(awk 'NF { print $1; exit }' "$SSH_DIR/id_rsa.pub")
+    PUB_KEY_BLOB=$(awk 'NF { print $2; exit }' "$SSH_DIR/id_rsa.pub")
+    case "$PUB_KEY_TYPE" in
         ssh-rsa | ssh-ed25519 | ecdsa-sha2-nistp256 | ecdsa-sha2-nistp384 | \
             ecdsa-sha2-nistp521) ;;
         *)
@@ -45,10 +56,17 @@ validate_public_key() {
             exit 1
             ;;
     esac
-    if [ -z "$blob" ] || [ "${#blob}" -lt 32 ]; then
+    if [ -z "$PUB_KEY_BLOB" ] || [ "${#PUB_KEY_BLOB}" -lt 32 ]; then
         echo "❌ ERROR: Public key blob is missing or too short."
         exit 1
     fi
+    # Base64 only: keeps the blob safe to embed in the remote awk/printf quoting.
+    case "$PUB_KEY_BLOB" in
+        *[!A-Za-z0-9+/=]*)
+            echo "❌ ERROR: Public key blob contains invalid characters."
+            exit 1
+            ;;
+    esac
 }
 
 ssh_host() {

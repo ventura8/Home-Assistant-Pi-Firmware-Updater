@@ -90,7 +90,7 @@ jobs:
           NOTES_FILE: ${{ steps.meta.outputs.notes_file }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3.0.2
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.notes.outputs.title }}

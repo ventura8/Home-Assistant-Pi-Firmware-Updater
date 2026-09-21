@@ -25,6 +25,8 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
 - Exit codes must reflect real success/failure
 - Component tests must cover changed behavior
 - Never append a bare unrestricted pubkey to host `authorized_keys`
+- `id_rsa.pub` must be exactly one record (supported type, base64 blob ≥ 32);
+  build the auth line / key blob only from validated fields, never raw file text
 - Host forced-command wrapper must allowlist only fixed integration commands and
   must never execute caller stdin as a shell program
 - Never allowlist deploy/upload ops on the permanent integration key
@@ -37,7 +39,9 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
    tests)
 2. Ensure RSA key material exists (`$SSH_DIR/id_rsa` / `id_rsa.pub`). Generate
    with comment `pi_firmware_updater`. If private exists without pub, recover via
-   `ssh-keygen -y` or abort before host auth.
+   `ssh-keygen -y` or abort before host auth. Validate the pub before any host
+   mutation: exactly one non-blank line, supported type, base64-only blob of at
+   least 32 chars; multi-line or malformed files abort with a clear error.
 3. Deploy host `host_check.sh` + `ssh_wrapper.sh` under
    `/root/.pi_firmware_updater/` and upsert restricted `authorized_keys`:
    `restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh" ...`
@@ -102,5 +106,7 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
 - Widen uninstall to wipe arbitrary user files
 - Switch to password-based host auth in committed defaults
 - Append unrestricted pubkeys or skip `from=` / forced-command restrictions
+- Pipe raw `id_rsa.pub` contents (or any multi-line value) into the remote
+  `authorized_keys` heredoc — a second line becomes a separate unrestricted key
 - Filter `authorized_keys` by comment text alone
 - Silence incomplete host cleanup with exit 0

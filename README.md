@@ -26,6 +26,9 @@ Update notification example
 * **255-Character Bypass:** Uses optimized SSH piping and string truncation to prevent sensor failure.  
 * **Zero-Password Security:** Uses RSA key pairs bound to `127.0.0.1` with a
   forced-command wrapper that only allows the integration's host check scripts.
+  The installer authorizes exactly one validated public key record — a
+  multi-line or malformed `/config/.ssh/id_rsa.pub` aborts setup before any
+  host change.
 * **One-Command Setup:** Automated script for SSH key management and Mobile ID config.
 
 ## **📋 Prerequisites**

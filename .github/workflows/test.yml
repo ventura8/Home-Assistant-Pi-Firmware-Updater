@@ -90,7 +90,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Cache Docker layers
         uses: actions/cache@v6.1.0
@@ -107,7 +107,7 @@ jobs:
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Build Image
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: tests/Dockerfile
@@ -177,7 +177,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Download Matrix Manifests
         uses: actions/download-artifact@v8.0.1
@@ -212,7 +212,7 @@ jobs:
             ${{ runner.os }}-buildx-${{ steps.merge-image.outputs.tag_name }}-
 
       - name: Build Merge Image (Cached)
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: tests/Dockerfile
