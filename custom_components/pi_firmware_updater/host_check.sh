@@ -4,10 +4,15 @@
 
 set -e
 
+# Shared literals emitted in the sensor payload.
+BOOT_STATUS_ALLOWED="allowed"
+VALUE_UNKNOWN="Unknown"
+
 # Helper to mock block device checks in tests
 if ! declare -F is_block_dev > /dev/null 2>&1; then
     is_block_dev() {
-        [ -b "$1" ]
+        local device_path="$1"
+        [[ -b "$device_path" ]]
     }
 fi
 
@@ -37,7 +42,7 @@ model_requires_boot_block() {
 normalize_device_path() {
     local device_path="$1"
 
-    if [ -n "$device_path" ] && [[ "$device_path" != /* ]]; then
+    if [[ -n "$device_path" ]] && [[ "$device_path" != /* ]]; then
         echo "/dev/${device_path##*/}"
         return 0
     fi
@@ -65,6 +70,7 @@ resolve_boot_device_identifier() {
                 return 0
             fi
             ;;
+        *) : ;;
     esac
 
     echo "$boot_device"
@@ -82,7 +88,7 @@ classify_boot_device() {
             echo "unsupported_boot_device_ssd"
             ;;
         *mmcblk* | *loop* | *overlay*)
-            echo "allowed"
+            echo "$BOOT_STATUS_ALLOWED"
             ;;
         *)
             echo "unsupported_boot_device"
@@ -103,7 +109,7 @@ load_eeprom_versions() {
     LAT_VER=$(echo "$EEPROM_OUT" | grep -m 1 "LATEST:" | cut -d: -f2- | xargs || true)
     BOOTLOADER_LINE=$(echo "$EEPROM_OUT" | grep "BOOTLOADER:" || true)
 
-    if [ -z "$CUR_VER" ] || [ -z "$LAT_VER" ]; then
+    if [[ -z "$CUR_VER" ]] || [[ -z "$LAT_VER" ]]; then
         return 3
     fi
 
@@ -126,22 +132,22 @@ validate_ha_update_readiness() {
         0)
             ;;
         2)
-            echo "ERROR: Failed to query firmware upgrade status from HA OS Agent."
+            echo "ERROR: Failed to query firmware upgrade status from HA OS Agent." >&2
             return 1
             ;;
         *)
-            echo "ERROR: Failed to parse HA OS firmware status response."
+            echo "ERROR: Failed to parse HA OS firmware status response." >&2
             return 1
             ;;
     esac
 
     if [[ "$ha_summary" == *"update_blocked: true"* ]]; then
-        echo "ERROR: Update is blocked by OS Agent."
+        echo "ERROR: Update is blocked by OS Agent." >&2
         return 1
     fi
 
     if [[ "$ha_summary" != *"update_available: true"* ]]; then
-        echo "ERROR: No firmware update is available."
+        echo "ERROR: No firmware update is available." >&2
         return 1
     fi
 
@@ -153,19 +159,19 @@ validate_fallback_update_readiness() {
     local eeprom_check=""
 
     boot_status=$(check_ssd_boot)
-    if [ "$boot_status" != "allowed" ]; then
-        echo "ERROR: Firmware update is blocked: $boot_status."
+    if [[ "$boot_status" != "$BOOT_STATUS_ALLOWED" ]]; then
+        echo "ERROR: Firmware update is blocked: $boot_status." >&2
         return 1
     fi
 
     if ! command -v rpi-eeprom-update > /dev/null 2>&1; then
-        echo "ERROR: rpi-eeprom-update utility not found."
+        echo "ERROR: rpi-eeprom-update utility not found." >&2
         return 1
     fi
 
     eeprom_check=$(timeout 15 rpi-eeprom-update 2> /dev/null) || true
     if ! echo "$eeprom_check" | grep -q "update available"; then
-        echo "ERROR: No firmware update is available."
+        echo "ERROR: No firmware update is available." >&2
         return 1
     fi
 
@@ -204,22 +210,22 @@ check_ssd_boot() {
     local boot_device=""
 
     # Check model
-    if [ -f "$model_file" ]; then
+    if [[ -f "$model_file" ]]; then
         MODEL=$(tr -d '\0' < "$model_file")
     else
-        MODEL="Unknown"
+        MODEL="$VALUE_UNKNOWN"
     fi
 
     # We only block SSD boot on Raspberry Pi 3 and 4 family (including CM3/CM4, CM4S, and Pi 400)
     if ! model_requires_boot_block "$MODEL"; then
-        echo "allowed"
+        echo "$BOOT_STATUS_ALLOWED"
         return 0
     fi
 
     # Find mount point for /boot/firmware, /boot, or /
     boot_device=$(findmnt -n -o SOURCE /boot/firmware || findmnt -n -o SOURCE /boot || findmnt -n -o SOURCE / || true)
 
-    if [ -z "$boot_device" ] && [ -f "$cmdline_file" ]; then
+    if [[ -z "$boot_device" ]] && [[ -f "$cmdline_file" ]]; then
         local root_part
         root_part=$(grep -o 'root=[^ ]*' "$cmdline_file" || true)
         boot_device=$(resolve_boot_device_identifier "${root_part#root=}")
@@ -238,8 +244,8 @@ query_ha_firmware() {
         return 2
     fi
 
-    local FORMATTED
-    FORMATTED=$(
+    local formatted
+    formatted=$(
         STATUS_JSON="$status_json" python3 - 2> /dev/null << 'EOF'
 import sys
 import json
@@ -293,18 +299,18 @@ except Exception:
 EOF
     ) || return 3
 
-    echo "$FORMATTED"
+    echo "$formatted"
     return 0
 }
 
 run_check() {
     # Check if ha CLI is available and has supervisor integration
-    local HA_SUMMARY
+    local ha_summary
     local boot_status=""
     local eeprom_status=0
 
-    if HA_SUMMARY=$(query_ha_firmware); then
-        echo "$HA_SUMMARY"
+    if ha_summary=$(query_ha_firmware); then
+        echo "$ha_summary"
         return 0
     fi
 
@@ -312,22 +318,23 @@ run_check() {
 
     case "$eeprom_status" in
         1)
-            emit_summary "Unknown" "Unknown" "false" "true" "rpi_eeprom_update_missing"
+            emit_summary "$VALUE_UNKNOWN" "$VALUE_UNKNOWN" "false" "true" "rpi_eeprom_update_missing"
             return 0
             ;;
         2)
-            emit_summary "Unknown" "Unknown" "false" "true" "eeprom_query_failed"
+            emit_summary "$VALUE_UNKNOWN" "$VALUE_UNKNOWN" "false" "true" "eeprom_query_failed"
             return 0
             ;;
         3)
-            emit_summary "Unknown" "Unknown" "false" "true" "eeprom_version_parse_error"
+            emit_summary "$VALUE_UNKNOWN" "$VALUE_UNKNOWN" "false" "true" "eeprom_version_parse_error"
             return 0
             ;;
+        *) : ;;
     esac
 
     # Check for SSD boot block
     boot_status=$(check_ssd_boot)
-    if [ "$boot_status" != "allowed" ]; then
+    if [[ "$boot_status" != "$BOOT_STATUS_ALLOWED" ]]; then
         emit_summary "$CUR_VER" "$LAT_VER" "$AVAIL" "true" "$boot_status"
         return 0
     fi
@@ -366,11 +373,11 @@ run_update() {
 
 # Main execution
 MODE="check"
-if [ "$1" = "--update" ]; then
+if [[ "$1" = "--update" ]]; then
     MODE="update"
 fi
 
-if [ "$MODE" = "update" ]; then
+if [[ "$MODE" = "update" ]]; then
     if ! run_update; then
         exit 1
     fi

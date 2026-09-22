@@ -53,6 +53,23 @@ ShellCheck, shfmt (check mode), YamlLint, markdownlint, hadolint, actionlint,
 JSON manifest validation (`manifest.json`), cyclomatic complexity, and
 non-Markdown 140-character line-length checks.
 
+### Static analysis (SonarQube Cloud)
+
+Organization `ventura8`, project `ventura8_Home-Assistant-Pi-Firmware-Updater`;
+configuration in `sonar-project.properties`. This is **in addition to** the
+lint inventory above, not a replacement — the local gate stays authoritative
+for merges.
+
+- Run locally with `./scripts/sonar_scan.sh` (scanner runs in Docker)
+- Exactly one analysis mode may be active: Automatic Analysis (no token, no
+  coverage import) or the CI job (imports kcov coverage, needs `SONAR_TOKEN`
+  plus the `SONAR_CI_ANALYSIS` repository variable). See
+  `docs/development_standards.md`
+- kcov records container-absolute paths (`/app/...`); rewrite them to
+  repository-relative before a scan or Sonar matches no files
+- Default `case` branches are written `*) : ;;` — a bare `*) ;;` satisfies
+  Sonar S131 but kcov cannot attribute it, which silently drops coverage
+
 ## Mandatory Test and Coverage Gates
 
 - Run tests through `./scripts/run_local_tests.ps1` for local parity with CI

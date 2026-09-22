@@ -146,7 +146,7 @@ function run_lint_suite {
 function run_suite {
     SUITE=$1
     echo "Running Bats Suite: $SUITE..."
-    if [ -d "tests/$SUITE" ]; then
+    if [[ -d "tests/$SUITE" ]]; then
         bats "tests/$SUITE"
     else
         echo "Suite tests/$SUITE not found!"
@@ -170,36 +170,36 @@ function run_coverage {
 MODE=$1
 ARG=$2
 
-if [ "$MODE" == "shellcheck" ]; then
+if [[ "$MODE" == "shellcheck" ]]; then
     run_shellcheck
-elif [ "$MODE" == "shfmt-check" ]; then
+elif [[ "$MODE" == "shfmt-check" ]]; then
     run_shfmt_check
-elif [ "$MODE" == "yamllint" ]; then
+elif [[ "$MODE" == "yamllint" ]]; then
     run_yamllint
-elif [ "$MODE" == "markdownlint" ]; then
+elif [[ "$MODE" == "markdownlint" ]]; then
     run_markdownlint
-elif [ "$MODE" == "hadolint" ]; then
+elif [[ "$MODE" == "hadolint" ]]; then
     run_hadolint
-elif [ "$MODE" == "actionlint" ]; then
+elif [[ "$MODE" == "actionlint" ]]; then
     run_actionlint
-elif [ "$MODE" == "manifest-json" ]; then
+elif [[ "$MODE" == "manifest-json" ]]; then
     run_manifest_json_check
-elif [ "$MODE" == "complexity" ]; then
+elif [[ "$MODE" == "complexity" ]]; then
     run_complexity_check
-elif [ "$MODE" == "line-length" ]; then
+elif [[ "$MODE" == "line-length" ]]; then
     run_non_markdown_line_length_check
-elif [ "$MODE" == "lint" ]; then
+elif [[ "$MODE" == "lint" ]]; then
     run_lint_suite
-elif [ "$MODE" == "tests" ]; then
-    if [ -n "$ARG" ]; then
+elif [[ "$MODE" == "tests" ]]; then
+    if [[ -n "$ARG" ]]; then
         run_suite "$ARG"
     else
         run_suite "unit"
         run_suite "component"
         run_suite "e2e"
     fi
-elif [ "$MODE" == "coverage" ]; then
-    if [ -n "$ARG" ]; then
+elif [[ "$MODE" == "coverage" ]]; then
+    if [[ -n "$ARG" ]]; then
         run_coverage "$ARG"
     else
         echo "Specify suite for coverage: unit, component, or e2e"

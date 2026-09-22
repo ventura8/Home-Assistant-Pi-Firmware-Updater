@@ -22,12 +22,18 @@ jobs:
     steps:
       - name: Resolve tag
         id: meta
+        env:
+          # Bind untrusted inputs to env vars so they are never interpolated
+          # into the shell source (S7630: script injection).
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
           else
-            TAG="${{ github.ref_name }}"
+            TAG="$REF_NAME"
           fi
           case "$TAG" in
             v[0-9]*.[0-9]*.[0-9]*) ;;
@@ -52,9 +58,8 @@ jobs:
         id: notes
         run: |
           set -euo pipefail
-          TAG="${{ steps.meta.outputs.tag }}"
-          VERSION="${{ steps.meta.outputs.version }}"
-          NOTES_FILE="${{ steps.meta.outputs.notes_file }}"
+          TAG="$META_TAG"
+          VERSION="$META_VERSION"
 
           MANIFEST_VERSION=$(python3 -c \
             "import json; print(json.load(open('custom_components/pi_firmware_updater/manifest.json'))['version'])")
@@ -87,10 +92,12 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         env:
+          META_TAG: ${{ steps.meta.outputs.tag }}
+          META_VERSION: ${{ steps.meta.outputs.version }}
           NOTES_FILE: ${{ steps.meta.outputs.notes_file }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3.0.3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.notes.outputs.title }}

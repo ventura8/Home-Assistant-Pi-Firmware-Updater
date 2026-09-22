@@ -5,46 +5,44 @@ ARG SHELLCHECK_VERSION=v0.11.0
 ARG SHELLCHECK_SHA256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
 ARG YAMLLINT_VERSION=1.38.0
 ARG LIZARD_VERSION=1.24.0
-ARG SHFMT_VERSION=v3.13.1
-ARG SHFMT_SHA256=fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+ARG SHFMT_VERSION=v3.14.1
+ARG SHFMT_SHA256=76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
 ARG HADOLINT_VERSION=v2.15.1
 ARG HADOLINT_SHA256=c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507
 ARG ACTIONLINT_VERSION=v1.7.12
 ARG ACTIONLINT_SHA256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
 ARG MARKDOWNLINT_CLI_VERSION=0.49.1
-ARG NODE_VERSION=26.8.1
-ARG NODE_SHA256=3e301118d7df53d563b7e96c1617545f26e2f76f9724be668d6cab65c15dda5d
+ARG NODE_VERSION=26.10.0
+ARG NODE_SHA256=ca70e9e349de048b9522abb3adc05b3bd6f43c5ffd3ec57916c7da292f59f022
 ARG KCOV_VERSION=v43
 ARG KCOV_SHA256=4cbba86af11f72de0c7514e09d59c7927ed25df7cebdad087f6d3623213b95bf
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     bats \
-    openssh-client \
-    coreutils \
-    dos2unix \
-    ca-certificates \
-    curl \
-    xz-utils \
-    python3-pip \
-    # Build dependencies for kcov
-    cmake \
-    build-essential \
-    pkg-config \
-    libcurl4-openssl-dev \
-    libelf-dev \
-    libdw-dev \
     binutils-dev \
+    build-essential \
+    ca-certificates \
+    cmake \
+    coreutils \
+    curl \
+    dos2unix \
+    libcurl4-openssl-dev \
+    libdw-dev \
+    libelf-dev \
     libiberty-dev \
-    zlib1g-dev \
-    python3 \
     libssl-dev \
-    wget \
+    openssh-client \
+    pkg-config \
+    python3 \
+    python3-pip \
+    xz-utils \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install shellcheck, shfmt, hadolint, and actionlint as pinned binaries.
-RUN curl -fsSL \
+RUN curl -fsSL --proto '=https' --tlsv1.2 \
     --retry 6 --retry-delay 2 --retry-all-errors \
     "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
     -o /tmp/shellcheck.tar.xz && \
@@ -53,20 +51,20 @@ RUN curl -fsSL \
     mv "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck && \
     chmod +x /usr/local/bin/shellcheck && \
     rm -rf /tmp/shellcheck* && \
-    curl -fsSL \
+    curl -fsSL --proto '=https' --tlsv1.2 \
     --retry 6 --retry-delay 2 --retry-all-errors \
     "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64" \
     -o /usr/local/bin/shfmt && \
     echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - && \
     chmod +x /usr/local/bin/shfmt && \
-    curl -fsSL \
+    curl -fsSL --proto '=https' --tlsv1.2 \
     --retry 6 --retry-delay 2 --retry-all-errors \
     "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64" \
     -o /usr/local/bin/hadolint && \
     echo "${HADOLINT_SHA256}  /usr/local/bin/hadolint" | sha256sum -c - && \
     chmod +x /usr/local/bin/hadolint && \
     ACTIONLINT_ARCHIVE="actionlint_${ACTIONLINT_VERSION#v}_linux_amd64.tar.gz" && \
-    curl -fsSL \
+    curl -fsSL --proto '=https' --tlsv1.2 \
     --retry 6 --retry-delay 2 --retry-all-errors \
     "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/${ACTIONLINT_ARCHIVE}" \
     -o /tmp/actionlint.tar.gz && \
@@ -77,7 +75,7 @@ RUN curl -fsSL \
     rm -rf /tmp/actionlint*
 
 # Install a pinned Node.js runtime for markdownlint-cli.
-RUN curl -fsSL --retry 6 --retry-delay 2 --retry-all-errors \
+RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 6 --retry-delay 2 --retry-all-errors \
     "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     -o /tmp/node.tar.xz && \
     echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - && \
@@ -85,14 +83,15 @@ RUN curl -fsSL --retry 6 --retry-delay 2 --retry-all-errors \
     rm -f /tmp/node.tar.xz
 
 # Install yamllint, lizard, and markdownlint-cli with pinned versions.
-RUN pip3 install --no-cache-dir --break-system-packages \
-    "yamllint==${YAMLLINT_VERSION}" \
-    "lizard==${LIZARD_VERSION}" && \
-    npm install --global "markdownlint-cli@${MARKDOWNLINT_CLI_VERSION}"
+RUN pip3 install --no-cache-dir --break-system-packages --only-binary :all: \
+    "lizard==${LIZARD_VERSION}" \
+    "yamllint==${YAMLLINT_VERSION}" && \
+    npm install --global --ignore-scripts "markdownlint-cli@${MARKDOWNLINT_CLI_VERSION}"
 
 # Install kcov (Split steps for debugging)
 WORKDIR /app
-RUN wget "https://github.com/SimonKagstrom/kcov/archive/refs/tags/${KCOV_VERSION}.tar.gz" -O kcov.tar.gz && \
+RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 6 --retry-delay 2 --retry-all-errors \
+    "https://github.com/SimonKagstrom/kcov/archive/refs/tags/${KCOV_VERSION}.tar.gz" -o kcov.tar.gz && \
     echo "${KCOV_SHA256}  kcov.tar.gz" | sha256sum -c - && \
     tar xzf kcov.tar.gz && \
     mv "kcov-${KCOV_VERSION#v}" /app/kcov

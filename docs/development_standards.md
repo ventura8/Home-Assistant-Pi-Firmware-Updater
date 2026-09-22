@@ -51,6 +51,45 @@ This script will:
 
 Always ensure you commit the updated `assets/coverage.svg` along with your code changes.
 
+## SonarQube Cloud Analysis
+
+Static analysis runs on SonarQube Cloud (organization `ventura8`, project key
+`ventura8_Home-Assistant-Pi-Firmware-Updater`). Configuration lives in
+`sonar-project.properties`.
+
+### Analysis modes
+
+Exactly one mode can be active at a time; SonarQube Cloud rejects a CI analysis while
+Automatic Analysis is enabled.
+
+**Automatic Analysis (current).** SonarQube Cloud scans `main` and pull requests
+server-side. It needs no token and no CI job, but it cannot import coverage, so the
+project shows 0% coverage on SonarQube Cloud. The kcov coverage gate in `test.yml` is
+unaffected and still enforces the 90% threshold.
+
+**CI-based (needed for coverage import).** The `sonarqube` job in `test.yml` runs after
+`report-coverage` and uploads the merged kcov report in SonarQube's Generic Test
+Coverage format. Because kcov records container-absolute paths (`/app/...`), the
+pipeline rewrites them to repository-relative paths before the scan.
+
+The job is gated on the `SONAR_CI_ANALYSIS` repository variable so it stays inert until
+the switchover. To switch:
+
+1. Create a token at **My Account -> Security** on SonarQube Cloud.
+2. `gh secret set SONAR_TOKEN`
+3. `gh variable set SONAR_CI_ANALYSIS --body true`
+4. Turn off **Administration -> Analysis Method -> Automatic Analysis** for the project.
+
+### Running Locally
+
+```bash
+SONAR_TOKEN=<token> ./scripts/sonar_scan.sh
+```
+
+The script runs `sonarsource/sonar-scanner-cli` in Docker, so no local Java or scanner
+install is needed. It reads the token from `~/.sonar_token` when `SONAR_TOKEN` is unset.
+Run the coverage suites first if you want coverage included in the analysis.
+
 ## Tools
 
 - **Bats-core:** Bash Automated Testing System.
@@ -62,3 +101,4 @@ Always ensure you commit the updated `assets/coverage.svg` along with your code 
 - **markdownlint-cli:** Markdown linting checks.
 - **hadolint:** Dockerfile linting checks.
 - **actionlint:** GitHub Actions workflow linting checks.
+- **SonarQube Cloud:** Continuous static analysis for bugs, code smells, security hotspots, and coverage tracking.
