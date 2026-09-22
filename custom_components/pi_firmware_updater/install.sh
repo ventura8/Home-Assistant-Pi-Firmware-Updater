@@ -66,7 +66,7 @@ validate_public_key() {
             echo "❌ ERROR: Public key blob contains invalid characters." >&2
             exit 1
             ;;
-        *) ;;
+        *) : ;;
     esac
 }
 

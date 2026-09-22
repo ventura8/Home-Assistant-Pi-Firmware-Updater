@@ -70,7 +70,7 @@ resolve_boot_device_identifier() {
                 return 0
             fi
             ;;
-        *) ;;
+        *) : ;;
     esac
 
     echo "$boot_device"
@@ -329,7 +329,7 @@ run_check() {
             emit_summary "$VALUE_UNKNOWN" "$VALUE_UNKNOWN" "false" "true" "eeprom_version_parse_error"
             return 0
             ;;
-        *) ;;
+        *) : ;;
     esac
 
     # Check for SSD boot block

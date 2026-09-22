@@ -18,7 +18,7 @@ The detailed documentation has been split into multiple files for easier navigat
   - Agent workflow summary; defers full law to `AGENTS.md`.
 - [Release Descriptions](releases)
   - GitHub-ready release/PR description markdown for each release commit.
-  - Latest: [v1.0.5](releases/v1.0.5.md)
+  - Latest: [v1.0.6](releases/v1.0.6.md)
 
 ## Agent Skills
 
