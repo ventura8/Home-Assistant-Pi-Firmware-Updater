@@ -299,6 +299,11 @@ jobs:
     name: SonarQube Cloud Analysis
     needs: report-coverage
     runs-on: ubuntu-24.04
+    # Inert until SONAR_TOKEN exists. SonarQube Cloud rejects a CI analysis
+    # while Automatic Analysis is enabled, so adding the secret and turning
+    # Automatic Analysis off are a single switchover -- see
+    # docs/development_standards.md.
+    if: vars.SONAR_CI_ANALYSIS == 'true'
     permissions:
       contents: read
     steps:

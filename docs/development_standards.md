@@ -57,12 +57,28 @@ Static analysis runs on SonarQube Cloud (organization `ventura8`, project key
 `ventura8_Home-Assistant-Pi-Firmware-Updater`). Configuration lives in
 `sonar-project.properties`.
 
-### In CI
+### Analysis modes
 
-The `sonarqube` job in `test.yml` runs after `report-coverage` and uploads the merged
-kcov report in SonarQube's Generic Test Coverage format. It requires the `SONAR_TOKEN`
-repository secret. Because kcov records container-absolute paths (`/app/...`), the
+Exactly one mode can be active at a time; SonarQube Cloud rejects a CI analysis while
+Automatic Analysis is enabled.
+
+**Automatic Analysis (current).** SonarQube Cloud scans `main` and pull requests
+server-side. It needs no token and no CI job, but it cannot import coverage, so the
+project shows 0% coverage on SonarQube Cloud. The kcov coverage gate in `test.yml` is
+unaffected and still enforces the 90% threshold.
+
+**CI-based (needed for coverage import).** The `sonarqube` job in `test.yml` runs after
+`report-coverage` and uploads the merged kcov report in SonarQube's Generic Test
+Coverage format. Because kcov records container-absolute paths (`/app/...`), the
 pipeline rewrites them to repository-relative paths before the scan.
+
+The job is gated on the `SONAR_CI_ANALYSIS` repository variable so it stays inert until
+the switchover. To switch:
+
+1. Create a token at **My Account -> Security** on SonarQube Cloud.
+2. `gh secret set SONAR_TOKEN`
+3. `gh variable set SONAR_CI_ANALYSIS --body true`
+4. Turn off **Administration -> Analysis Method -> Automatic Analysis** for the project.
 
 ### Running Locally
 
