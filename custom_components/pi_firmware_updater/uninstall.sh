@@ -41,7 +41,7 @@ EOF
 cleanup_host_authorization() {
     echo "🧹 Removing host authorized_keys entry and wrapper..."
 
-    if [ -f "$SSH_DIR/id_rsa" ]; then
+    if [[ -f "$SSH_DIR/id_rsa" ]]; then
         if ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
             -i "$SSH_DIR/id_rsa" "$SSH_TARGET" 'pi_firmware_uninstall' 2> /dev/null; then
             echo "✅ Host authorization cleaned up."
@@ -62,7 +62,7 @@ cleanup_host_authorization() {
 }
 
 remove_local_keys() {
-    if [ -f "$SSH_DIR/id_rsa" ] || [ -f "$SSH_DIR/id_rsa.pub" ]; then
+    if [[ -f "$SSH_DIR/id_rsa" ]] || [[ -f "$SSH_DIR/id_rsa.pub" ]]; then
         echo "🔑 Removing local SSH keys..."
         rm -f "$SSH_DIR/id_rsa" "$SSH_DIR/id_rsa.pub"
     else
@@ -73,13 +73,13 @@ remove_local_keys() {
 revert_mobile_configs() {
     echo "undoing config changes..."
 
-    if [ -f "$CONFIG_DIR/update_notification.yaml" ]; then
+    if [[ -f "$CONFIG_DIR/update_notification.yaml" ]]; then
         echo "Reverting update_notification.yaml..."
         sed -i 's/action: notify\..*/action: notify.REPLACE_WITH_YOUR_DEVICE_ID/' \
             "$CONFIG_DIR/update_notification.yaml"
     fi
 
-    if [ -f "$CONFIG_DIR/action_handler.yaml" ]; then
+    if [[ -f "$CONFIG_DIR/action_handler.yaml" ]]; then
         echo "Reverting action_handler.yaml..."
         sed -i 's/action: notify\..*/action: notify.REPLACE_WITH_YOUR_DEVICE_ID/' \
             "$CONFIG_DIR/action_handler.yaml"
@@ -98,7 +98,7 @@ main() {
     remove_local_keys
     revert_mobile_configs
 
-    if [ "$host_status" -ne 0 ]; then
+    if [[ "$host_status" -ne 0 ]]; then
         echo "⚠️ Uninstall finished with incomplete host cleanup."
         return "$host_status"
     fi

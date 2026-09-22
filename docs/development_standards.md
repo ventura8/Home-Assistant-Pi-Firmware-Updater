@@ -51,6 +51,29 @@ This script will:
 
 Always ensure you commit the updated `assets/coverage.svg` along with your code changes.
 
+## SonarQube Cloud Analysis
+
+Static analysis runs on SonarQube Cloud (organization `ventura8`, project key
+`ventura8_Home-Assistant-Pi-Firmware-Updater`). Configuration lives in
+`sonar-project.properties`.
+
+### In CI
+
+The `sonarqube` job in `test.yml` runs after `report-coverage` and uploads the merged
+kcov report in SonarQube's Generic Test Coverage format. It requires the `SONAR_TOKEN`
+repository secret. Because kcov records container-absolute paths (`/app/...`), the
+pipeline rewrites them to repository-relative paths before the scan.
+
+### Running Locally
+
+```bash
+SONAR_TOKEN=<token> ./scripts/sonar_scan.sh
+```
+
+The script runs `sonarsource/sonar-scanner-cli` in Docker, so no local Java or scanner
+install is needed. It reads the token from `~/.sonar_token` when `SONAR_TOKEN` is unset.
+Run the coverage suites first if you want coverage included in the analysis.
+
 ## Tools
 
 - **Bats-core:** Bash Automated Testing System.
@@ -62,3 +85,4 @@ Always ensure you commit the updated `assets/coverage.svg` along with your code 
 - **markdownlint-cli:** Markdown linting checks.
 - **hadolint:** Dockerfile linting checks.
 - **actionlint:** GitHub Actions workflow linting checks.
+- **SonarQube Cloud:** Continuous static analysis for bugs, code smells, security hotspots, and coverage tracking.

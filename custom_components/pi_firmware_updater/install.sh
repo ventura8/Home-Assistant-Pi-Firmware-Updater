@@ -35,13 +35,13 @@ get_key_blob() {
 # appended to the host as a separate, unrestricted authorized_keys entry.
 validate_public_key() {
     local record_count
-    if [ ! -s "$SSH_DIR/id_rsa.pub" ]; then
-        echo "❌ ERROR: Public key file is missing or empty."
+    if [[ ! -s "$SSH_DIR/id_rsa.pub" ]]; then
+        echo "❌ ERROR: Public key file is missing or empty." >&2
         exit 1
     fi
     record_count=$(grep -c '[^[:space:]]' "$SSH_DIR/id_rsa.pub" || true)
-    if [ "$record_count" -ne 1 ]; then
-        echo "❌ ERROR: Public key file must contain exactly one key line (found ${record_count})."
+    if [[ "$record_count" -ne 1 ]]; then
+        echo "❌ ERROR: Public key file must contain exactly one key line (found ${record_count})." >&2
         exit 1
     fi
     # Exactly one non-blank record exists at this point; parse that record
@@ -52,27 +52,28 @@ validate_public_key() {
         ssh-rsa | ssh-ed25519 | ecdsa-sha2-nistp256 | ecdsa-sha2-nistp384 | \
             ecdsa-sha2-nistp521) ;;
         *)
-            echo "❌ ERROR: Unsupported or malformed public key type."
+            echo "❌ ERROR: Unsupported or malformed public key type." >&2
             exit 1
             ;;
     esac
-    if [ -z "$PUB_KEY_BLOB" ] || [ "${#PUB_KEY_BLOB}" -lt 32 ]; then
-        echo "❌ ERROR: Public key blob is missing or too short."
+    if [[ -z "$PUB_KEY_BLOB" ]] || [[ "${#PUB_KEY_BLOB}" -lt 32 ]]; then
+        echo "❌ ERROR: Public key blob is missing or too short." >&2
         exit 1
     fi
     # Base64 only: keeps the blob safe to embed in the remote awk/printf quoting.
     case "$PUB_KEY_BLOB" in
         *[!A-Za-z0-9+/=]*)
-            echo "❌ ERROR: Public key blob contains invalid characters."
+            echo "❌ ERROR: Public key blob contains invalid characters." >&2
             exit 1
             ;;
+        *) ;;
     esac
 }
 
 ssh_host() {
     local use_identity="$1"
     shift
-    if [ "$use_identity" = "yes" ]; then
+    if [[ "$use_identity" = "yes" ]]; then
         ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
             -i "$SSH_DIR/id_rsa" "$SSH_TARGET" "$@"
     else
@@ -132,12 +133,12 @@ authorize_key_on_host() {
     auth_line=$(build_authorized_keys_line)
     key_blob=$(get_key_blob)
 
-    if [ ! -f "$WRAPPER_SRC" ]; then
-        echo "❌ ERROR: Missing wrapper source at ${WRAPPER_SRC}"
+    if [[ ! -f "$WRAPPER_SRC" ]]; then
+        echo "❌ ERROR: Missing wrapper source at ${WRAPPER_SRC}" >&2
         exit 1
     fi
-    if [ ! -f "$CONFIG_DIR/host_check.sh" ]; then
-        echo "❌ ERROR: Missing host_check.sh at ${CONFIG_DIR}/host_check.sh"
+    if [[ ! -f "$CONFIG_DIR/host_check.sh" ]]; then
+        echo "❌ ERROR: Missing host_check.sh at ${CONFIG_DIR}/host_check.sh" >&2
         exit 1
     fi
 
@@ -153,36 +154,36 @@ authorize_key_on_host() {
         echo "✅ Authorization successful!"
         return 0
     fi
-    echo "❌ ERROR: Could not authorize key."
+    echo "❌ ERROR: Could not authorize key." >&2
     echo "   Ensure 'HassOS SSH Port Configurator' is RUNNING with a password set."
     exit 1
 }
 
 ensure_ssh_key_material() {
-    if [ ! -d "$SSH_DIR" ]; then
+    if [[ ! -d "$SSH_DIR" ]]; then
         echo "📂 Creating $SSH_DIR directory..."
         mkdir -p "$SSH_DIR"
     fi
 
-    if [ ! -f "$SSH_DIR/id_rsa" ]; then
+    if [[ ! -f "$SSH_DIR/id_rsa" ]]; then
         echo "🔑 Generating RSA key pair..."
         ssh-keygen -t rsa -f "$SSH_DIR/id_rsa" -N "" -C "$KEY_COMMENT"
         return 0
     fi
 
-    if [ -f "$SSH_DIR/id_rsa.pub" ]; then
+    if [[ -f "$SSH_DIR/id_rsa.pub" ]]; then
         echo "ℹ️ SSH key already exists, skipping generation."
         return 0
     fi
 
     echo "🔑 Regenerating public key from existing private key..."
     if ! ssh-keygen -y -f "$SSH_DIR/id_rsa" > "$SSH_DIR/id_rsa.pub"; then
-        echo "❌ ERROR: Could not regenerate id_rsa.pub from id_rsa."
+        echo "❌ ERROR: Could not regenerate id_rsa.pub from id_rsa." >&2
         rm -f "$SSH_DIR/id_rsa.pub"
         exit 1
     fi
-    if [ ! -s "$SSH_DIR/id_rsa.pub" ]; then
-        echo "❌ ERROR: Regenerated id_rsa.pub is empty."
+    if [[ ! -s "$SSH_DIR/id_rsa.pub" ]]; then
+        echo "❌ ERROR: Regenerated id_rsa.pub is empty." >&2
         rm -f "$SSH_DIR/id_rsa.pub"
         exit 1
     fi
@@ -206,11 +207,11 @@ setup_mobile_id() {
     echo "You can find this in Developer Tools -> Actions -> Search 'notify.mobile_app_'"
     echo ""
     echo ""
-    if [ -z "$MOBILE_ID" ]; then
+    if [[ -z "$MOBILE_ID" ]]; then
         read -r -p "Enter your Notify ID (e.g., notify.mobile_app_iphone): " MOBILE_ID || true
     fi
 
-    if [ -n "$MOBILE_ID" ]; then
+    if [[ -n "$MOBILE_ID" ]]; then
         echo "🔄 Updating automation files with ID: $MOBILE_ID"
         sed -i "s/notify.REPLACE_WITH_YOUR_DEVICE_ID/$MOBILE_ID/g" \
             "$CONFIG_DIR/update_notification.yaml"

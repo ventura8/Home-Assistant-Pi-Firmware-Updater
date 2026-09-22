@@ -12,10 +12,10 @@ AUTH_KEYS="/root/.ssh/authorized_keys"
 
 remove_managed_auth_line() {
     local blob=""
-    if [ -f "$KEY_BLOB_FILE" ]; then
+    if [[ -f "$KEY_BLOB_FILE" ]]; then
         blob=$(cat "$KEY_BLOB_FILE")
     fi
-    if [ ! -f "$AUTH_KEYS" ]; then
+    if [[ ! -f "$AUTH_KEYS" ]]; then
         return 0
     fi
     # Prefer blob+wrapper match; always drop lines that reference this wrapper.
