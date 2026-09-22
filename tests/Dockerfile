@@ -84,8 +84,8 @@ RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 6 --retry-delay 2 --retry-all-
 
 # Install yamllint, lizard, and markdownlint-cli with pinned versions.
 RUN pip3 install --no-cache-dir --break-system-packages --only-binary :all: \
-    "yamllint==${YAMLLINT_VERSION}" \
-    "lizard==${LIZARD_VERSION}" && \
+    "lizard==${LIZARD_VERSION}" \
+    "yamllint==${YAMLLINT_VERSION}" && \
     npm install --global --ignore-scripts "markdownlint-cli@${MARKDOWNLINT_CLI_VERSION}"
 
 # Install kcov (Split steps for debugging)

@@ -14,19 +14,19 @@ SCANNER_IMAGE="${SCANNER_IMAGE:-sonarsource/sonar-scanner-cli:11}"
 COVERAGE_REPORT="${REPO_ROOT}/coverage/merged/kcov-merged/sonarqube.xml"
 
 TOKEN_FILE="${SONAR_TOKEN_FILE:-${HOME}/.sonar_token}"
-if [ -z "${SONAR_TOKEN:-}" ] && [ -r "$TOKEN_FILE" ]; then
+if [[ -z "${SONAR_TOKEN:-}" ]] && [[ -r "$TOKEN_FILE" ]]; then
     SONAR_TOKEN="$(tr -d '[:space:]' < "$TOKEN_FILE")"
     export SONAR_TOKEN
 fi
 
-if [ -z "${SONAR_TOKEN:-}" ]; then
+if [[ -z "${SONAR_TOKEN:-}" ]]; then
     echo "SONAR_TOKEN is not set and ${TOKEN_FILE} is unreadable." >&2
     echo "Create a token at https://sonarcloud.io/account/security" >&2
     exit 1
 fi
 
 function normalise_coverage_paths {
-    if [ ! -f "$COVERAGE_REPORT" ]; then
+    if [[ ! -f "$COVERAGE_REPORT" ]]; then
         echo "No merged coverage report at ${COVERAGE_REPORT}; running analysis without coverage."
         return 0
     fi
