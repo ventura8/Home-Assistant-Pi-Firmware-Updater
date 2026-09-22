@@ -303,7 +303,12 @@ jobs:
     # while Automatic Analysis is enabled, so adding the secret and turning
     # Automatic Analysis off are a single switchover -- see
     # docs/development_standards.md.
-    if: vars.SONAR_CI_ANALYSIS == 'true'
+    # Forked PRs and Dependabot PRs cannot read SONAR_TOKEN, so the scan
+    # would fail for reasons the contributor cannot fix.
+    if: >-
+      vars.SONAR_CI_ANALYSIS == 'true'
+      && github.event.pull_request.head.repo.fork != true
+      && github.actor != 'dependabot[bot]'
     permissions:
       contents: read
     steps:
