@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 ARG BASE_IMAGE=debian:bookworm-slim
 FROM ${BASE_IMAGE}
 
@@ -16,8 +17,37 @@ ARG NODE_VERSION=26.10.0
 ARG NODE_SHA256=ca70e9e349de048b9522abb3adc05b3bd6f43c5ffd3ec57916c7da292f59f022
 ARG KCOV_VERSION=v43
 ARG KCOV_SHA256=4cbba86af11f72de0c7514e09d59c7927ed25df7cebdad087f6d3623213b95bf
+# Unprivileged test user. The default matches the GitHub-hosted runner user so
+# bind-mounted coverage directories stay writable; override on other hosts.
+ARG TEST_UID=1001
+ARG TEST_GID=1001
 
-# Install dependencies
+# Fetch pinned tool artifacts; ADD --checksum verifies every download.
+ADD --checksum=sha256:${SHELLCHECK_SHA256} \
+    "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+    /tmp/tools/shellcheck.tar.xz
+ADD --checksum=sha256:${SHFMT_SHA256} --chmod=755 \
+    "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64" \
+    /usr/local/bin/shfmt
+ADD --checksum=sha256:${HADOLINT_SHA256} --chmod=755 \
+    "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64" \
+    /usr/local/bin/hadolint
+ADD --checksum=sha256:${ACTIONLINT_SHA256} \
+    "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION#v}_linux_amd64.tar.gz" \
+    /tmp/tools/actionlint.tar.gz
+ADD --checksum=sha256:${NODE_SHA256} \
+    "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+    /tmp/tools/node.tar.xz
+ADD --checksum=sha256:${KCOV_SHA256} \
+    "https://github.com/SimonKagstrom/kcov/archive/refs/tags/${KCOV_VERSION}.tar.gz" \
+    /tmp/tools/kcov.tar.gz
+
+# Install system packages, unpack the pinned tools (shellcheck, actionlint,
+# Node.js for markdownlint-cli), install yamllint/lizard/markdownlint-cli,
+# build kcov, then create the unprivileged test user and hand it the paths the
+# suites write to: the mock /config tree (with the dummy YAML files install.sh
+# modifies), the host_check.sh log, and /root, which stands in for the Home
+# Assistant host's root home that ssh_wrapper.sh manages.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     bats \
@@ -39,95 +69,48 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     xz-utils \
     zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install shellcheck, shfmt, hadolint, and actionlint as pinned binaries.
-RUN curl -fsSL --proto '=https' --tlsv1.2 \
-    --retry 6 --retry-delay 2 --retry-all-errors \
-    "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-    -o /tmp/shellcheck.tar.xz && \
-    echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c - && \
-    tar -xJf /tmp/shellcheck.tar.xz -C /tmp && \
-    mv "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck && \
-    chmod +x /usr/local/bin/shellcheck && \
-    rm -rf /tmp/shellcheck* && \
-    curl -fsSL --proto '=https' --tlsv1.2 \
-    --retry 6 --retry-delay 2 --retry-all-errors \
-    "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64" \
-    -o /usr/local/bin/shfmt && \
-    echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - && \
-    chmod +x /usr/local/bin/shfmt && \
-    curl -fsSL --proto '=https' --tlsv1.2 \
-    --retry 6 --retry-delay 2 --retry-all-errors \
-    "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64" \
-    -o /usr/local/bin/hadolint && \
-    echo "${HADOLINT_SHA256}  /usr/local/bin/hadolint" | sha256sum -c - && \
-    chmod +x /usr/local/bin/hadolint && \
-    ACTIONLINT_ARCHIVE="actionlint_${ACTIONLINT_VERSION#v}_linux_amd64.tar.gz" && \
-    curl -fsSL --proto '=https' --tlsv1.2 \
-    --retry 6 --retry-delay 2 --retry-all-errors \
-    "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/${ACTIONLINT_ARCHIVE}" \
-    -o /tmp/actionlint.tar.gz && \
-    echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c - && \
-    tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint && \
-    mv /tmp/actionlint /usr/local/bin/actionlint && \
-    chmod +x /usr/local/bin/actionlint && \
-    rm -rf /tmp/actionlint*
-
-# Install a pinned Node.js runtime for markdownlint-cli.
-RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 6 --retry-delay 2 --retry-all-errors \
-    "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
-    -o /tmp/node.tar.xz && \
-    echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - && \
-    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 && \
-    rm -f /tmp/node.tar.xz
-
-# Install yamllint, lizard, and markdownlint-cli with pinned versions.
-RUN pip3 install --no-cache-dir --break-system-packages --only-binary :all: \
+    && rm -rf /var/lib/apt/lists/* && \
+    tar -xJf /tmp/tools/shellcheck.tar.xz -C /tmp/tools && \
+    install -m 755 "/tmp/tools/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck && \
+    tar -xzf /tmp/tools/actionlint.tar.gz -C /tmp/tools actionlint && \
+    install -m 755 /tmp/tools/actionlint /usr/local/bin/actionlint && \
+    tar -xJf /tmp/tools/node.tar.xz -C /usr/local --strip-components=1 && \
+    pip3 install --no-cache-dir --break-system-packages --only-binary :all: \
     "lizard==${LIZARD_VERSION}" \
     "yamllint==${YAMLLINT_VERSION}" && \
-    npm install --global --ignore-scripts "markdownlint-cli@${MARKDOWNLINT_CLI_VERSION}"
-
-# Install kcov (Split steps for debugging)
-WORKDIR /app
-RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 6 --retry-delay 2 --retry-all-errors \
-    "https://github.com/SimonKagstrom/kcov/archive/refs/tags/${KCOV_VERSION}.tar.gz" -o kcov.tar.gz && \
-    echo "${KCOV_SHA256}  kcov.tar.gz" | sha256sum -c - && \
-    tar xzf kcov.tar.gz && \
-    mv "kcov-${KCOV_VERSION#v}" /app/kcov
-WORKDIR /app/kcov/build
-RUN cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
-RUN make
-RUN make install
-WORKDIR /app
-RUN rm -rf /app/kcov /app/kcov.tar.gz
-
-# Mock /config directory which install.sh expects
-RUN mkdir -p /config/custom_components/pi_firmware_updater
-
-# Create dummy yaml files that install.sh tries to modify
-WORKDIR /config/custom_components/pi_firmware_updater
-RUN touch update_notification.yaml action_handler.yaml
+    npm install --global --ignore-scripts "markdownlint-cli@${MARKDOWNLINT_CLI_VERSION}" && \
+    mkdir -p /tmp/tools/kcov && \
+    tar -xzf /tmp/tools/kcov.tar.gz -C /tmp/tools/kcov --strip-components=1 && \
+    cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -S /tmp/tools/kcov -B /tmp/tools/kcov/build && \
+    cmake --build /tmp/tools/kcov/build && \
+    cmake --install /tmp/tools/kcov/build && \
+    rm -rf /tmp/tools && \
+    groupadd --non-unique --gid "${TEST_GID}" tester && \
+    useradd --non-unique --uid "${TEST_UID}" --gid "${TEST_GID}" --create-home --shell /bin/bash tester && \
+    mkdir -p /config/custom_components/pi_firmware_updater /app/coverage && \
+    touch /config/custom_components/pi_firmware_updater/update_notification.yaml \
+    /config/custom_components/pi_firmware_updater/action_handler.yaml \
+    /var/log/pi_firmware_update.log && \
+    chown -R tester:tester /config /app /root /var/log/pi_firmware_update.log
 
 # Set working directory for tests
 WORKDIR /app
 
-# Copy project files
-COPY . /app/
+# Copy only what the in-image test suites need (lint runs against a mounted
+# workspace instead).
+COPY --chown=tester:tester custom_components /app/custom_components
+COPY --chown=tester:tester tests /app/tests
 
-# Convert line endings for Windows compatibility
-RUN find /app -type f -name "*.sh" -exec dos2unix {} + && \
-    find /app -type f -name "*.bats" -exec dos2unix {} + && \
-    find /app -type f -name "*.yaml" -exec dos2unix {} + && \
-    find /app -type f -name "*.yml" -exec dos2unix {} + && \
-    find /app -type f -name ".yamllint" -exec dos2unix {} + && \
-    find /app/tests/mocks -type f -exec dos2unix {} +
+USER ${TEST_UID}:${TEST_GID}
 
 # Add mocks to PATH
 ENV PATH="/app/tests/mocks:$PATH"
 
-# Make scripts executable
-RUN chmod +x /app/custom_components/pi_firmware_updater/*.sh && \
+# Convert line endings for Windows compatibility and make scripts executable
+RUN find /app -type f \( -name "*.sh" -o -name "*.bats" -o -name "*.yaml" -o -name "*.yml" \) \
+    -exec dos2unix {} + && \
+    find /app/tests/mocks -type f -exec dos2unix {} + && \
+    chmod +x /app/custom_components/pi_firmware_updater/*.sh && \
     chmod +x /app/tests/mocks/* && \
     chmod +x /app/tests/run_tests.sh
 
