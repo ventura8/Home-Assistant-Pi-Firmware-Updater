@@ -22,8 +22,15 @@ function Invoke-NativeStep {
     }
 }
 
+# The image runs as an unprivileged user; on Linux match the host UID/GID so
+# bind-mounted directories stay writable (Docker Desktop does not need this).
+$buildArgs = @()
+if ($IsLinux) {
+    $buildArgs = @("--build-arg", "TEST_UID=$(id -u)", "--build-arg", "TEST_GID=$(id -g)")
+}
+
 Write-Host "Building Docker environment..." -ForegroundColor Cyan
-$exitCode = Invoke-NativeStep { docker build -t ha-updater-test -f tests/Dockerfile . }
+$exitCode = Invoke-NativeStep { docker build @buildArgs -t ha-updater-test -f tests/Dockerfile . }
 
 if ($exitCode -ne 0) {
     Write-Error "Docker build failed."
@@ -45,6 +52,9 @@ if ($exitCode -ne 0) {
 }
 
 Write-Host "Generating Coverage Reports..." -ForegroundColor Cyan
+# Create coverage/ as the host user; a missing bind-mount source is created
+# root-owned by Docker, which the unprivileged container user cannot write.
+$null = New-Item -ItemType Directory -Path coverage -Force
 $exitCode = Invoke-NativeStep {
     docker run --rm -v ${PWD}/coverage:/app/coverage ha-updater-test `
         /app/tests/run_tests.sh coverage unit

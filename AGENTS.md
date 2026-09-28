@@ -69,6 +69,11 @@ for merges.
   repository-relative before a scan or Sonar matches no files
 - Default `case` branches are written `*) : ;;` — a bare `*) ;;` satisfies
   Sonar S131 but kcov cannot attribute it, which silently drops coverage
+- `tests/Dockerfile` invariants (keep Sonar clean): download pinned tools
+  with `ADD --checksum=sha256:...` (not `curl` in `RUN`), keep consecutive
+  `RUN` steps merged, `COPY` only the directories the suites need (never
+  a recursive `COPY .`), and end as the unprivileged `TEST_UID`/`TEST_GID` user
+  (default 1001, the GitHub runner UID; CI passes the runner's `id -u`/`id -g`)
 
 ## Mandatory Test and Coverage Gates
 

@@ -46,7 +46,10 @@ pwsh -File ./scripts/run_local_tests.ps1 \
 
 This is CI parity for this repo:
 
-1. `docker build -t ha-updater-test -f tests/Dockerfile .`
+1. `docker build -t ha-updater-test -f tests/Dockerfile .` (the image runs as
+   an unprivileged user; on Linux the PowerShell runners add
+   `--build-arg TEST_UID=$(id -u) --build-arg TEST_GID=$(id -g)` so mounted
+   `coverage/` stays writable; pass them yourself when building by hand)
 2. Lint gate (mounted workspace): `./tests/run_tests.sh lint`
 3. Bats unit + component + e2e (image `/app`)
 4. kcov coverage per suite → merge → `tests/transform_coverage.py` badge

@@ -104,14 +104,23 @@ jobs:
         id: meta
         run: |
           TAG_NAME=$(echo "${{ matrix.base_image }}" | tr ':' '-')
-          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          # The image runs as an unprivileged user; match the runner so the
+          # bind-mounted coverage directory stays writable.
+          {
+            echo "tag_name=$TAG_NAME"
+            echo "uid=$(id -u)"
+            echo "gid=$(id -g)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build Image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           file: tests/Dockerfile
-          build-args: BASE_IMAGE=${{ matrix.base_image }}
+          build-args: |
+            BASE_IMAGE=${{ matrix.base_image }}
+            TEST_UID=${{ steps.meta.outputs.uid }}
+            TEST_GID=${{ steps.meta.outputs.gid }}
           tags: ha-updater-test:${{ steps.meta.outputs.tag_name }}
           load: true
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -200,8 +209,12 @@ jobs:
           TAG_NAME=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['tag_name'])" \
             "$MANIFEST_FILE")
 
-          echo "base_image=$BASE_IMAGE" >> "$GITHUB_OUTPUT"
-          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          {
+            echo "base_image=$BASE_IMAGE"
+            echo "tag_name=$TAG_NAME"
+            echo "uid=$(id -u)"
+            echo "gid=$(id -g)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Cache Docker layers
         uses: actions/cache@v6.1.0
@@ -216,7 +229,10 @@ jobs:
         with:
           context: .
           file: tests/Dockerfile
-          build-args: BASE_IMAGE=${{ steps.merge-image.outputs.base_image }}
+          build-args: |
+            BASE_IMAGE=${{ steps.merge-image.outputs.base_image }}
+            TEST_UID=${{ steps.merge-image.outputs.uid }}
+            TEST_GID=${{ steps.merge-image.outputs.gid }}
           tags: ha-updater-test:${{ steps.merge-image.outputs.tag_name }}
           load: true
           cache-from: type=local,src=/tmp/.buildx-cache

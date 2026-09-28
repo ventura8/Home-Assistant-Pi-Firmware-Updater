@@ -47,6 +47,25 @@ This script will:
 - **Markdown exception:** Markdown line-length is not enforced.
 - **No suppressions:** Do not disable lint rules to pass checks.
 
+### Test image (`tests/Dockerfile`)
+
+- Pinned tool downloads use `ADD --checksum=sha256:<digest>`, so a changed
+  upstream artifact fails the build. Bump the version and digest together.
+- The image copies only `custom_components/` and `tests/`. The lint gate runs
+  against the mounted workspace (`-v "$PWD:/work" -w /work`), not the image.
+- The image runs as the unprivileged `tester` user (`TEST_UID`/`TEST_GID`,
+  default `1001`). The user owns `/config`, `/app`, `/root` (standing in for
+  the Home Assistant host's root home) and `/var/log/pi_firmware_update.log`.
+  CI builds with the runner's `id -u`/`id -g` so bind-mounted coverage
+  directories stay writable. On Linux, `scripts/run_local_tests.ps1` and
+  `scripts/run_coverage.ps1` pass the host's `id -u`/`id -g` the same way. For
+  a manual build on Linux, add
+  `--build-arg TEST_UID=$(id -u) --build-arg TEST_GID=$(id -g)`. Docker
+  Desktop does not need this.
+- Create `coverage/` on the host before bind-mounting it. Docker creates a
+  missing mount source owned by root, and the unprivileged user then cannot
+  write to it. Both PowerShell runners do this.
+
 ### Committing Changes
 
 Always ensure you commit the updated `assets/coverage.svg` along with your code changes.
