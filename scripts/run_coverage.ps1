@@ -2,8 +2,15 @@
 
 $ErrorActionPreference = "Stop"
 
+# The image runs as an unprivileged user; on Linux match the host UID/GID so
+# bind-mounted directories stay writable (Docker Desktop does not need this).
+$buildArgs = @()
+if ($IsLinux) {
+    $buildArgs = @("--build-arg", "TEST_UID=$(id -u)", "--build-arg", "TEST_GID=$(id -g)")
+}
+
 Write-Host "Building Docker environment..." -ForegroundColor Cyan
-docker build -t ha-updater-test -f tests/Dockerfile .
+docker build @buildArgs -t ha-updater-test -f tests/Dockerfile .
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Docker build failed."

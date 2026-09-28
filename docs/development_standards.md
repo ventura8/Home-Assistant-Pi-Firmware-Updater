@@ -57,9 +57,11 @@ This script will:
   default `1001`). The user owns `/config`, `/app`, `/root` (standing in for
   the Home Assistant host's root home) and `/var/log/pi_firmware_update.log`.
   CI builds with the runner's `id -u`/`id -g` so bind-mounted coverage
-  directories stay writable. On a Linux host whose UID is not 1001, build with
-  `--build-arg TEST_UID=$(id -u) --build-arg TEST_GID=$(id -g)` before
-  mounting host directories. Docker Desktop does not need this.
+  directories stay writable. On Linux, `scripts/run_local_tests.ps1` and
+  `scripts/run_coverage.ps1` pass the host's `id -u`/`id -g` the same way. For
+  a manual build on Linux, add
+  `--build-arg TEST_UID=$(id -u) --build-arg TEST_GID=$(id -g)`. Docker
+  Desktop does not need this.
 
 ### Committing Changes
 
