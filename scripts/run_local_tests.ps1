@@ -52,6 +52,9 @@ if ($exitCode -ne 0) {
 }
 
 Write-Host "Generating Coverage Reports..." -ForegroundColor Cyan
+# Create coverage/ as the host user; a missing bind-mount source is created
+# root-owned by Docker, which the unprivileged container user cannot write.
+$null = New-Item -ItemType Directory -Path coverage -Force
 $exitCode = Invoke-NativeStep {
     docker run --rm -v ${PWD}/coverage:/app/coverage ha-updater-test `
         /app/tests/run_tests.sh coverage unit

@@ -62,6 +62,9 @@ This script will:
   a manual build on Linux, add
   `--build-arg TEST_UID=$(id -u) --build-arg TEST_GID=$(id -g)`. Docker
   Desktop does not need this.
+- Create `coverage/` on the host before bind-mounting it. Docker creates a
+  missing mount source owned by root, and the unprivileged user then cannot
+  write to it. Both PowerShell runners do this.
 
 ### Committing Changes
 
