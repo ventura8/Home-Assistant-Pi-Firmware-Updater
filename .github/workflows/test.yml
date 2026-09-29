@@ -6,6 +6,9 @@ name: Run Tests
     branches: ["main", "master"]
   pull_request:
     branches: ["main", "master"]
+  # Manual runs pick up new repository variables and secrets; a re-run of an
+  # older run does not.
+  workflow_dispatch:
 
 permissions:
   contents: read
