@@ -28,8 +28,9 @@ Update notification example
   forced-command wrapper that only allows the integration's host check scripts.
   The installer authorizes exactly one validated public key record that must
   match `/config/.ssh/id_rsa` — a multi-line, malformed, or mismatched
-  `/config/.ssh/id_rsa.pub` aborts setup before any host change, and host
-  cleanup only removes exact key matches.
+  `/config/.ssh/id_rsa.pub` aborts setup before any host change. Host cleanup
+  only removes `authorized_keys` lines that reference the integration's
+  wrapper path or whose key exactly matches the managed key.
 * **One-Command Setup:** Automated script for SSH key management and Mobile ID config.
 
 ## **📋 Prerequisites**
