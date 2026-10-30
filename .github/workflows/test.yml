@@ -192,7 +192,7 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
       - name: Download Matrix Manifests
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@v8.0.2
         with:
           pattern: matrix-manifest-*
           path: coverage-manifest
@@ -241,7 +241,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
 
       - name: Download Coverage Artifacts
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@v8.0.2
         with:
           pattern: coverage-*
           path: coverage
@@ -339,7 +339,7 @@ jobs:
           persist-credentials: false
 
       - name: Download Sonar Coverage Artifact
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@v8.0.2
         with:
           name: sonar-coverage
           path: coverage/merged/kcov-merged
