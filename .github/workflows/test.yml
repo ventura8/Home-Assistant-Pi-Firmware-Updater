@@ -152,7 +152,7 @@ jobs:
             /app/tests/run_tests.sh coverage e2e
 
       - name: Upload Coverage Artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: coverage-${{ steps.meta.outputs.tag_name }}
           path: coverage/${{ steps.meta.outputs.tag_name }}
@@ -169,7 +169,7 @@ jobs:
           EOF
 
       - name: Upload Matrix Manifest
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: matrix-manifest-${{ steps.meta.outputs.tag_name }}
           path: coverage-manifest/${{ steps.meta.outputs.tag_name }}.json
@@ -308,7 +308,7 @@ jobs:
           sed -i 's#path="/app/#path="#g' coverage/merged/kcov-merged/sonarqube.xml
 
       - name: Upload Sonar Coverage Artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: sonar-coverage
           path: coverage/merged/kcov-merged/sonarqube.xml
