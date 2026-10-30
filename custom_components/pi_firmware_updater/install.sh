@@ -20,6 +20,10 @@ WRAPPER_SRC="${CONFIG_DIR}/ssh_wrapper.sh"
 # is built ONLY from these, never from the raw id_rsa.pub contents.
 PUB_KEY_TYPE=""
 PUB_KEY_BLOB=""
+# Shortest real blob we accept: ssh-ed25519 keys encode to 68 base64 chars.
+# Anything shorter cannot be a complete key and would make host-side
+# authorized_keys matching ambiguous.
+MIN_KEY_BLOB_LENGTH=68
 
 build_authorized_keys_line() {
     printf 'restrict,from="127.0.0.1",command="%s" %s %s %s\n' \
@@ -56,7 +60,7 @@ validate_public_key() {
             exit 1
             ;;
     esac
-    if [[ -z "$PUB_KEY_BLOB" ]] || [[ "${#PUB_KEY_BLOB}" -lt 32 ]]; then
+    if [[ -z "$PUB_KEY_BLOB" ]] || [[ "${#PUB_KEY_BLOB}" -lt "$MIN_KEY_BLOB_LENGTH" ]]; then
         echo "❌ ERROR: Public key blob is missing or too short." >&2
         exit 1
     fi
@@ -68,6 +72,24 @@ validate_public_key() {
             ;;
         *) : ;;
     esac
+    verify_public_key_matches_private
+}
+
+# The pub file is only trusted when it is the public half of id_rsa: a planted
+# or stale id_rsa.pub must never drive host authorized_keys edits.
+verify_public_key_matches_private() {
+    local derived derived_type derived_blob
+    if ! derived=$(ssh-keygen -y -f "$SSH_DIR/id_rsa" 2> /dev/null); then
+        echo "❌ ERROR: Could not derive the public key from ${SSH_DIR}/id_rsa." >&2
+        exit 1
+    fi
+    derived_type=$(printf '%s\n' "$derived" | awk 'NF { print $1; exit }')
+    derived_blob=$(printf '%s\n' "$derived" | awk 'NF { print $2; exit }')
+    if [[ "$derived_type" != "$PUB_KEY_TYPE" ]] || [[ "$derived_blob" != "$PUB_KEY_BLOB" ]]; then
+        echo "❌ ERROR: ${SSH_DIR}/id_rsa.pub does not match ${SSH_DIR}/id_rsa." >&2
+        echo "   Delete ${SSH_DIR}/id_rsa.pub and re-run install.sh to regenerate it." >&2
+        exit 1
+    fi
 }
 
 ssh_host() {
@@ -96,9 +118,8 @@ chmod 700 ${WRAPPER_DIR} /root/.ssh
 touch /root/.ssh/authorized_keys
 chmod 600 /root/.ssh/authorized_keys
 awk -v blob='${key_blob}' -v wrap='${WRAPPER_PATH}' '
-  blob != "" && index(\$0, blob) && index(\$0, wrap) { next }
-  blob != "" && index(\$0, blob) { next }
   index(\$0, wrap) { next }
+  blob != "" { for (i = 1; i <= NF; i++) if (\$i == blob) next }
   { print }
 ' /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.tmp
 mv /root/.ssh/authorized_keys.tmp /root/.ssh/authorized_keys

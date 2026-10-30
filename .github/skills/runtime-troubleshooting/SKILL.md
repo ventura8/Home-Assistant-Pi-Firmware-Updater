@@ -68,6 +68,7 @@ Ask for or inspect, in order:
 | Symptom | Likely cause | Where to look |
 | --- | --- | --- |
 | `Permission denied (publickey)` | Key missing/mismatched, or `authorized_keys` entry missing/malformed on host | `install.sh` re-run; `docs/integration_logic.md` key flow |
+| `install.sh`: `id_rsa.pub does not match id_rsa` | Stale or planted `/config/.ssh/id_rsa.pub` (not the public half of `id_rsa`) | Check who wrote `/config/.ssh/`; delete `id_rsa.pub` and re-run `install.sh` to regenerate it — never bypass the check |
 | `pi_firmware_updater: command denied` | Caller sent something other than the four allowlisted operations (`pi_firmware_check`, `pi_firmware_update`, `pi_firmware_uninstall`, `exit`) | `ssh_wrapper.sh` — never widen the allowlist to "fix" this |
 | Sensor stuck on `unknown`/`unavailable` | `command_line_sensors.yaml` command failing or timing out, or `emit_summary` fields drifted | Skill `ha-yaml-integration-edits`; verify field names against `host_check.sh` |
 | Update runs, no reboot | Update command in the `&&` chain failed (check `/var/log/pi_firmware_update.log`), or `ha`/`rpi-eeprom-update` missing | Skill `host-check-update-safety` |

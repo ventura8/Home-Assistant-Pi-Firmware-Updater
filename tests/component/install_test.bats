@@ -19,6 +19,7 @@ setup() {
     unset MOCK_SSH_FAIL
     unset MOCK_SSH_CONNECTION_CHECK_FAIL
     unset MOCK_SSH_AUTHORIZE_FAIL
+    unset MOCK_SSH_KEYGEN_DERIVE_FAIL
     export MOCK_SSH_LOG="$BATS_TMPDIR/ssh_log"
     export MOCK_SSH_STDIN_LOG="$BATS_TMPDIR/ssh_stdin"
     rm -f "$MOCK_SSH_LOG" "$MOCK_SSH_STDIN_LOG"
@@ -27,13 +28,16 @@ setup() {
 teardown() {
     rm -rf /config/.ssh
     rm -rf /config/custom_components
-    rm -rf /root/.pi_firmware_updater
+    rm -rf /root/.pi_firmware_updater /root/.ssh
     rm -f "$MOCK_SSH_LOG" "$MOCK_SSH_STDIN_LOG"
 }
 
+EXISTING_KEY="ssh-rsa AAAAMOCKEXISTINGKEYDATAEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE pi_firmware_updater"
+
+# Mock convention: a private key file holding a pub line derives to that pub.
 seed_existing_key() {
-    touch /config/.ssh/id_rsa
-    echo "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    echo "$EXISTING_KEY" > /config/.ssh/id_rsa
+    echo "$EXISTING_KEY" > /config/.ssh/id_rsa.pub
 }
 
 @test "Fails if Mobile ID is not provided" {
@@ -83,7 +87,7 @@ seed_existing_key() {
     [[ "$output" == *"Regenerating public key"* ]]
     [ -s /config/.ssh/id_rsa.pub ]
     run cat /config/.ssh/id_rsa.pub
-    [[ "$output" == *"AAAAMOCKRECOVEREDKEYDATALONGERTHANTHIRTYTWOCHARS"* ]]
+    [[ "$output" == *"AAAAMOCKRECOVEREDKEYDATARRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"* ]]
 }
 
 @test "Rejects empty public key before host authorization" {
@@ -100,7 +104,7 @@ seed_existing_key() {
 @test "Rejects multi-line public key before any host mutation" {
     touch /config/.ssh/id_rsa
     printf '%s\n%s\n' \
-        "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" \
+        "$EXISTING_KEY" \
         "ssh-rsa AAAAMOCKPLANTEDATTACKERKEYDATASTRINGWITHLENGTH attacker" \
         > /config/.ssh/id_rsa.pub
     export MOBILE_ID="notify.test"
@@ -112,21 +116,96 @@ seed_existing_key() {
 }
 
 @test "Accepts a single key record surrounded by blank lines" {
-    touch /config/.ssh/id_rsa
+    echo "$EXISTING_KEY" > /config/.ssh/id_rsa
     printf '\n%s\n\n' \
-        "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" \
+        "$EXISTING_KEY" \
         > /config/.ssh/id_rsa.pub
     export MOBILE_ID="notify.test"
 
     run bash "$INSTALL_SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Authorization successful"* ]]
-    grep -q 'ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater' "$MOCK_SSH_STDIN_LOG"
+    grep -qF "$EXISTING_KEY" "$MOCK_SSH_STDIN_LOG"
+}
+
+@test "Rejects truncated public key blob before any host mutation" {
+    touch /config/.ssh/id_rsa
+    echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3 pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Public key blob is missing or too short"* ]]
+    [ ! -f "$MOCK_SSH_STDIN_LOG" ]
+}
+
+@test "Rejects public key that does not match the private key" {
+    seed_existing_key
+    echo "ssh-rsa AAAAMOCKPLANTEDKEYDATA$(printf 'P%.0s' {1..60}) pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    export MOBILE_ID="notify.test"
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"does not match"* ]]
+    [ ! -f "$MOCK_SSH_STDIN_LOG" ]
+}
+
+@test "Rejects install when the public key cannot be derived from id_rsa" {
+    seed_existing_key
+    export MOBILE_ID="notify.test"
+
+    MOCK_SSH_KEYGEN_DERIVE_FAIL=true run bash "$INSTALL_SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Could not derive the public key"* ]]
+    [ ! -f "$MOCK_SSH_STDIN_LOG" ]
+}
+
+@test "Host refresh removes only the managed entry and exact key matches" {
+    seed_existing_key
+    export MOBILE_ID="notify.test"
+    blob=$(awk '{ print $2 }' /config/.ssh/id_rsa.pub)
+    prefix_admin="ssh-rsa ${blob}EXTRA admin@laptop"
+    mkdir -p /root/.ssh
+    printf '%s\n' \
+        "$prefix_admin" \
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTHERADMINKEY other@host" \
+        "ssh-rsa ${blob} stale_copy" \
+        'restrict,command="/root/.pi_firmware_updater/ssh_wrapper.sh" ssh-rsa AAAAOLDMANAGED old' \
+        > /root/.ssh/authorized_keys
+
+    run bash "$INSTALL_SCRIPT"
+    [ "$status" -eq 0 ]
+    run bash -s < <(sed -n '/^set -e$/,$p' "$MOCK_SSH_STDIN_LOG")
+    [ "$status" -eq 0 ]
+
+    grep -qxF "$prefix_admin" /root/.ssh/authorized_keys
+    grep -q 'other@host' /root/.ssh/authorized_keys
+    ! grep -q 'stale_copy' /root/.ssh/authorized_keys
+    ! grep -q 'AAAAOLDMANAGED' /root/.ssh/authorized_keys
+    [ "$(grep -c 'ssh_wrapper.sh' /root/.ssh/authorized_keys)" -eq 1 ]
+    [ "$(cat /root/.pi_firmware_updater/key.blob)" = "$blob" ]
+}
+
+@test "Wrapper uninstall keeps keys that only share a prefix with the managed blob" {
+    WRAPPER=/config/custom_components/pi_firmware_updater/ssh_wrapper.sh
+    blob="AAAAB3NzaC1yc2EAAAADAQABAAABAQC3MANAGEDKEY"
+    mkdir -p /root/.ssh /root/.pi_firmware_updater
+    printf '%s\n' "$blob" > /root/.pi_firmware_updater/key.blob
+    printf '%s\n' \
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3ADMINKEY admin@laptop" \
+        "restrict,command=\"/root/.pi_firmware_updater/ssh_wrapper.sh\" ssh-rsa ${blob} pi_firmware_updater" \
+        "ssh-rsa ${blob} unmanaged_copy" \
+        > /root/.ssh/authorized_keys
+
+    run env SSH_ORIGINAL_COMMAND='pi_firmware_uninstall' bash "$WRAPPER"
+    [ "$status" -eq 0 ]
+    [ "$(cat /root/.ssh/authorized_keys)" = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3ADMINKEY admin@laptop" ]
+    [ ! -d /root/.pi_firmware_updater ]
 }
 
 @test "Rejects public key blob with non-base64 characters" {
     touch /config/.ssh/id_rsa
-    echo "ssh-rsa AAAAMOCKKEY'DATASTRINGWITHQUOTEANDLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    echo "ssh-rsa AAAAMOCKKEY'DATA$(printf 'Q%.0s' {1..60}) pi_firmware_updater" > /config/.ssh/id_rsa.pub
     export MOBILE_ID="notify.test"
 
     run bash "$INSTALL_SCRIPT"
@@ -137,7 +216,7 @@ seed_existing_key() {
 
 @test "Rejects unsupported public key type" {
     touch /config/.ssh/id_rsa
-    echo "ssh-dss AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    echo "${EXISTING_KEY/ssh-rsa/ssh-dss}" > /config/.ssh/id_rsa.pub
     export MOBILE_ID="notify.test"
 
     run bash "$INSTALL_SCRIPT"
@@ -155,7 +234,7 @@ seed_existing_key() {
     run sed -n "/<<'AUTH'/,/^AUTH$/p" "$MOCK_SSH_STDIN_LOG"
     [ "$(printf '%s\n' "$output" | wc -l)" -eq 3 ]
     expected='restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh"'
-    expected="$expected ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater"
+    expected="$expected $EXISTING_KEY"
     [[ "$output" == *"$expected"* ]]
 }
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 # Mock ssh-keygen
 # Supports -f/-C key generation and -y public-key recovery.
+# Mock key convention: a private key file whose content is a public key line
+# "is" that key, so -y prints it back. An empty private key file recovers a
+# fixed default key. MOCK_SSH_KEYGEN_DERIVE_FAIL=true makes -y fail.
 
 comment=""
 outfile=""
@@ -21,8 +24,16 @@ while [ $i -lt ${#args[@]} ]; do
 done
 
 if [ "$print_pub" = true ]; then
+    if [ "${MOCK_SSH_KEYGEN_DERIVE_FAIL:-}" = "true" ]; then
+        echo "mock ssh-keygen -y: forced failure" >&2
+        exit 1
+    fi
     if [ -n "$outfile" ] && [ -f "$outfile" ]; then
-        echo "ssh-rsa AAAAMOCKRECOVEREDKEYDATALONGERTHANTHIRTYTWOCHARS pi_firmware_updater"
+        if [ -s "$outfile" ]; then
+            cat "$outfile"
+        else
+            echo "ssh-rsa AAAAMOCKRECOVEREDKEYDATARRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR pi_firmware_updater"
+        fi
         exit 0
     fi
     echo "mock ssh-keygen -y: missing key file" >&2
@@ -30,9 +41,9 @@ if [ "$print_pub" = true ]; then
 fi
 
 if [ -n "$outfile" ]; then
-    touch "$outfile"
+    echo "ssh-rsa AAAAMOCKGENERATEDKEYDATAGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG ${comment}" > "$outfile"
     if [ -n "$comment" ]; then
-        echo "ssh-rsa AAAAMOCKKEYDATALONGERTHANTHIRTYTWOCHARSXX ${comment}" > "${outfile}.pub"
+        cp "$outfile" "${outfile}.pub"
     else
         touch "${outfile}.pub"
     fi
