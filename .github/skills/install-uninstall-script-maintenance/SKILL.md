@@ -25,12 +25,13 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
 - Exit codes must reflect real success/failure
 - Component tests must cover changed behavior
 - Never append a bare unrestricted pubkey to host `authorized_keys`
-- `id_rsa.pub` must be exactly one record (supported type, base64 blob ≥ 32);
-  build the auth line / key blob only from validated fields, never raw file text
+- `id_rsa.pub` must be exactly one record (supported type, base64 blob ≥ 68)
+  matching `ssh-keygen -y -f id_rsa`; build the auth line / key blob only from validated fields, never raw file text
 - Host forced-command wrapper must allowlist only fixed integration commands and
   must never execute caller stdin as a shell program
 - Never allowlist deploy/upload ops on the permanent integration key
-- Managed `authorized_keys` removal matches key blob + wrapper path only
+- Managed `authorized_keys` removal matches the wrapper path or an exact key
+  field (`$i == blob`) only — never `index($0, blob)` substring matching
 - Install/refresh host file deployment uses password bootstrap only
 
 ## Install Expectations
@@ -41,7 +42,8 @@ Playbook for `custom_components/pi_firmware_updater/install.sh` and
    with comment `pi_firmware_updater`. If private exists without pub, recover via
    `ssh-keygen -y` or abort before host auth. Validate the pub before any host
    mutation: exactly one non-blank line, supported type, base64-only blob of at
-   least 32 chars; multi-line or malformed files abort with a clear error.
+   least 68 chars, type + blob equal to `ssh-keygen -y -f id_rsa`; multi-line,
+   malformed, or mismatched files abort with a clear error.
 3. Deploy host `host_check.sh` + `ssh_wrapper.sh` under
    `/root/.pi_firmware_updater/` and upsert restricted `authorized_keys`:
    `restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh" ...`

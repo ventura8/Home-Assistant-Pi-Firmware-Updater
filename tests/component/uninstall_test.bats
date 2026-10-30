@@ -8,7 +8,8 @@ setup() {
     echo "    - action: notify.my_phone" > /config/custom_components/pi_firmware_updater/action_handler.yaml
 
     touch /config/.ssh/id_rsa
-    echo "ssh-rsa AAAAMOCKEXISTINGKEYDATASTRINGWITHLENGTH pi_firmware_updater" > /config/.ssh/id_rsa.pub
+    blob="AAAAMOCKEXISTINGKEYDATA$(printf 'E%.0s' {1..60})"
+    echo "ssh-rsa ${blob} pi_firmware_updater" > /config/.ssh/id_rsa.pub
 
     SCRIPT_DIR="/app/custom_components/pi_firmware_updater"
     UNINSTALL_SCRIPT="$SCRIPT_DIR/uninstall.sh"

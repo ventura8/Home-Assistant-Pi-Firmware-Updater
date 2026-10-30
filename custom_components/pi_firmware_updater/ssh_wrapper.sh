@@ -18,10 +18,12 @@ remove_managed_auth_line() {
     if [[ ! -f "$AUTH_KEYS" ]]; then
         return 0
     fi
-    # Prefer blob+wrapper match; always drop lines that reference this wrapper.
+    # Drop lines that reference this wrapper, plus any line whose key field is
+    # exactly the managed blob (never a substring match: unrelated keys sharing
+    # a common prefix must survive).
     awk -v blob="$blob" -v wrap="$WRAPPER" '
-        (blob != "" && index($0, blob) && index($0, wrap)) { next }
         index($0, wrap) { next }
+        blob != "" { for (i = 1; i <= NF; i++) if ($i == blob) next }
         { print }
     ' "$AUTH_KEYS" > "${AUTH_KEYS}.tmp"
     mv "${AUTH_KEYS}.tmp" "$AUTH_KEYS"

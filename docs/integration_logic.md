@@ -15,8 +15,11 @@ Private key path: `/config/.ssh/id_rsa` (passphrase-less for unattended `shell_c
    `/root/.pi_firmware_updater/`, stores the key blob, and upserts a restricted
    `authorized_keys` line:
    `restrict,from="127.0.0.1",command="/root/.pi_firmware_updater/ssh_wrapper.sh" ...`
-4. Managed auth-line removal matches **key blob + wrapper path** (never
-   comment-only deletes).
+4. Managed auth-line removal drops lines containing the wrapper path and lines
+   with a field **exactly equal** to the managed key blob. It never uses a
+   substring/prefix match (unrelated admin keys can share a common blob prefix)
+   and never deletes by comment alone. Host-side uninstall
+   (`pi_firmware_uninstall`) uses the same rule.
 5. Wrapper allowlists fixed ops only (`pi_firmware_check`, `pi_firmware_update`,
    `pi_firmware_uninstall`, `exit`) and never executes caller stdin as a shell
    program. Deploy/upload ops are **not** allowlisted — install/refresh uses the
@@ -24,7 +27,9 @@ Private key path: `/config/.ssh/id_rsa` (passphrase-less for unattended `shell_c
 6. Re-running install refreshes host scripts and `authorized_keys` via password
    bootstrap. Public keys are validated before any remote mutation: the file
    must hold exactly one record with a supported key type and a base64 blob of
-   at least 32 characters. Only the validated type + blob are used to build the
+   at least 68 characters, and its type + blob must equal what
+   `ssh-keygen -y -f /config/.ssh/id_rsa` derives. A mismatched pub (stale or
+   planted) aborts setup; delete `id_rsa.pub` and re-run to regenerate it. Only the validated type + blob are used to build the
    restricted `authorized_keys` line, so extra lines in `id_rsa.pub` (e.g.
    planted by another component with `/config` write access) are rejected
    instead of being appended to the host as unrestricted entries.

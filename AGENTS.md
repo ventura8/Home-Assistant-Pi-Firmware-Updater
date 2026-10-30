@@ -180,17 +180,21 @@ YAML edit procedures: `.github/skills/ha-yaml-integration-edits/SKILL.md`.
   caller stdin as a shell program; never allowlist deploy/upload ops
 - Host file deployment and auth upsert use the **password bootstrap channel**
   on port 22222 (separate from the restricted integration key)
-- Managed `authorized_keys` cleanup matches **key blob + wrapper path** (never
-  comment-only deletion of unrelated admin keys)
+- Managed `authorized_keys` cleanup drops lines containing the wrapper path
+  plus lines with a field **exactly equal** to the managed key blob — never a
+  substring/prefix match (unrelated admin keys can share a blob prefix) and
+  never comment-only deletion
 - Re-running install must refresh host `host_check.sh`, wrapper, and restricted
   `authorized_keys` via password bootstrap
 - If `id_rsa` exists without `id_rsa.pub`, regenerate the pub via `ssh-keygen -y`
   or abort before host authorization; reject empty/malformed pubs before remote
   mutation
 - `id_rsa.pub` must contain **exactly one** key record (supported type, base64
-  blob ≥ 32 chars). The host `authorized_keys` line and stored key blob are
-  built only from the validated type/blob fields — never from raw file contents,
-  so a planted second line can never become an unrestricted root key
+  blob ≥ 68 chars — the shortest real key, ed25519) whose type and blob equal
+  `ssh-keygen -y -f id_rsa` output; a mismatched or underivable pub aborts
+  before any host mutation. The host `authorized_keys` line and stored key blob
+  are built only from the validated type/blob fields — never from raw file
+  contents, so a planted second line can never become an unrestricted root key
 - Uninstall must attempt host cleanup even when the local private key is absent
   (try `pi_firmware_uninstall` when key present; otherwise/after failure try
   password-bootstrap cleanup); missing-key or failed cleanup is incomplete:
